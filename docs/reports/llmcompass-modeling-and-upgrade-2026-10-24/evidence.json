@@ -1,0 +1,82 @@
+{
+  "commit": "2e015fd2ee750e6cad8d7152df52551e5b41ef20",
+  "date": "2026-10-24",
+  "python": "3.13.11 | packaged by Anaconda, Inc. | (main, Dec 10 2025, 21:28:48) [GCC 14.3.0]",
+  "scope": "Bounded read-only execution of existing Matmul.simulate for two hand-selected mappings and original AllReduce.simulate. Only the unused SCALE-Sim import was removed in-memory; fallback and file writes were forbidden. No exhaustive search, GPU execution, or full reproduction.",
+  "source_sha256": "5e2d7db2385483f1e4bacb8764ebf59cc77f7db6fc9513321433766e0f0e63f6",
+  "lookup_sha256": "69447b4e376118a939967122a7de13849e5225cd6ba92bf65c8f37badbdd7607",
+  "candidate_shape": [
+    256,
+    256,
+    256
+  ],
+  "outer_tile": [
+    256,
+    256,
+    256
+  ],
+  "array_partition": [
+    2,
+    2,
+    1
+  ],
+  "candidate_results": [
+    {
+      "l1_tile": [
+        64,
+        64,
+        64
+      ],
+      "double_buffer_bytes": 49152,
+      "cycles": 759,
+      "latency_us": 0.5382978723404255
+    },
+    {
+      "l1_tile": [
+        128,
+        128,
+        128
+      ],
+      "double_buffer_bytes": 196608,
+      "cycles": 2477,
+      "latency_us": 1.7567375886524823
+    }
+  ],
+  "allreduce": [
+    {
+      "bytes": 8,
+      "predicted_us": 26.760849999999998
+    },
+    {
+      "bytes": 4096,
+      "predicted_us": 26.787599999999998
+    },
+    {
+      "bytes": 1048576,
+      "predicted_us": 33.72359999999999
+    },
+    {
+      "bytes": 67108864,
+      "predicted_us": 472.4052
+    }
+  ],
+  "derived_example": {
+    "B": 8,
+    "S": 2048,
+    "D": 12288,
+    "TP": 4,
+    "heads": 96,
+    "Q_MNK": [
+      16384,
+      3072,
+      12288
+    ],
+    "Q_flops": 1236950581248,
+    "Q_minimum_bytes": 578813952,
+    "Q_compute_lower_bound_ms": 3.966244917257683,
+    "Q_memory_lower_bound_ms": 0.2838714820990682,
+    "score_tensor_bytes": 1610612736,
+    "KV_per_layer_per_rank_bytes": 201326592,
+    "peak_flops_per_s": 311869440000000.0
+  }
+}

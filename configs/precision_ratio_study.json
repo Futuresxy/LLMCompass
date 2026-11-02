@@ -1,0 +1,49 @@
+{
+  "description": "Illustrative shape proxies only; not measured or extracted model traces.",
+  "hardware": {
+    "rows": 16, "cols": 16, "core_count": 16, "arrays_per_core": 4,
+    "frequency_hz": 1000000000,
+    "hbm_bytes_per_second": 1000000000000,
+    "l2_bytes_per_cycle": 4096
+  },
+  "base_dot_length": 16,
+  "profiles": [[1, 2, 4], [1, 2, 6], [1, 2, 8], [1, 4, 8]],
+  "baseline": "1:2:4",
+  "formats": ["fp16", "bf16", "mxfp8", "mxfp6", "mxfp4", "nvfp4", "hif4"],
+  "workloads": [
+    {
+      "name": "dense_prefill_proxy", "family": "dense_proxy", "split": "design",
+      "non_gemm_seconds": 0,
+      "ops": [
+        {"name": "projection", "m": 512, "n": 4096, "k": 4096, "count": 4},
+        {"name": "ffn_up", "m": 512, "n": 11008, "k": 4096},
+        {"name": "ffn_down", "m": 512, "n": 4096, "k": 11008}
+      ]
+    },
+    {
+      "name": "dense_decode_proxy", "family": "dense_proxy", "split": "design",
+      "non_gemm_seconds": 0,
+      "ops": [
+        {"name": "projection", "m": 1, "n": 4096, "k": 4096, "count": 4},
+        {"name": "ffn_up", "m": 1, "n": 11008, "k": 4096},
+        {"name": "ffn_down", "m": 1, "n": 4096, "k": 11008}
+      ]
+    },
+    {
+      "name": "expert_microbatch_proxy", "family": "expert_proxy", "split": "holdout",
+      "non_gemm_seconds": 0,
+      "ops": [
+        {"name": "expert_up", "m": 7, "n": 2048, "k": 4096, "count": 8},
+        {"name": "expert_down", "m": 7, "n": 4096, "k": 2048, "count": 8}
+      ]
+    },
+    {
+      "name": "short_k_attention_proxy", "family": "attention_proxy", "split": "holdout",
+      "non_gemm_seconds": 0,
+      "ops": [
+        {"name": "qk", "m": 128, "n": 1024, "k": 128, "batch_count": 32},
+        {"name": "pv", "m": 128, "n": 128, "k": 1024, "batch_count": 32}
+      ]
+    }
+  ]
+}

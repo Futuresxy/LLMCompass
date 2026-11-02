@@ -1,0 +1,379 @@
+{
+  "status": "passed",
+  "date": "2026-10-29",
+  "sources": {
+    "ascend_2201": "https://asc.gitcode.com/guide/programming_guide/advanced_programming/hardware_implementation/architecture_spec/npu_arch_2201.html",
+    "ascend_3510": "https://asc.gitcode.com/guide/programming_guide/advanced_programming/hardware_implementation/architecture_spec/npu_arch_3510.html",
+    "ascend_mmad": "https://asc.gitcode.com/api/SIMD-API/c_api/cube_compute/mmad_compute/asc_mmad.html",
+    "ascend_counters": "https://github.com/Ascend/msopprof/blob/master/docs/en/user_guide/msopprof_performance_data.md",
+    "flashattention4": "https://arxiv.org/html/2603.05451v1",
+    "ptx": "https://docs.nvidia.com/cuda/parallel-thread-execution/",
+    "blackwell_ultra": "https://developer.nvidia.com/blog/inside-nvidia-blackwell-ultra-the-chip-powering-the-ai-factory-era/"
+  },
+  "kind": "Published path references plus analytical estimates; no device benchmark",
+  "unknown_policy": "null means no verified numeric peak for this exact path; capacity and row width are not bandwidth",
+  "units": "Byte/cycle per AIC or SM; FLOP counts multiply and add separately; GHz times Byte/cycle gives decimal GB/s",
+  "public_paths": [
+    {
+      "architecture": "Ascend NPU_ARCH 2201 (A2/A3)",
+      "scope": "per AIC",
+      "capacity_bytes": {
+        "L0A": 65536,
+        "L0B": 65536,
+        "L0C": 131072
+      },
+      "path_bytes_per_cycle": {
+        "L1_to_L0A": 256,
+        "L1_to_L0B": 128,
+        "L0A_to_Cube": null,
+        "L0B_to_Cube": null,
+        "Cube_L0C_read": null,
+        "Cube_L0C_write": null,
+        "L0C_to_Fixpipe": null
+      },
+      "source": "https://asc.gitcode.com/guide/programming_guide/advanced_programming/hardware_implementation/architecture_spec/npu_arch_2201.html"
+    },
+    {
+      "architecture": "Ascend NPU_ARCH 3510 (950-family profile must match device)",
+      "scope": "per AIC",
+      "capacity_bytes": {
+        "L0A": 65536,
+        "L0B": 65536,
+        "L0C": 262144
+      },
+      "path_bytes_per_cycle": {
+        "L1_to_L0A": 256,
+        "L1_to_L0B": 256,
+        "L0C_to_UB_via_Fixpipe": 128,
+        "L0C_to_L1_via_Fixpipe": 128,
+        "L0A_to_Cube": null,
+        "L0B_to_Cube": null,
+        "Cube_L0C_read": null,
+        "Cube_L0C_write": null
+      },
+      "source": "https://asc.gitcode.com/guide/programming_guide/advanced_programming/hardware_implementation/architecture_spec/npu_arch_3510.html"
+    },
+    {
+      "architecture": "Hopper H100",
+      "scope": "per SM",
+      "capacity_bytes": {
+        "TMEM": 0
+      },
+      "path_bytes_per_cycle": {
+        "SMEM_read_reference": 128
+      },
+      "evidence_kind": "Research microbenchmark reference, not a vendor guarantee for all paths",
+      "source": "https://arxiv.org/html/2603.05451v1"
+    },
+    {
+      "architecture": "Blackwell B200",
+      "scope": "per SM",
+      "capacity_bytes": {
+        "TMEM": 262144
+      },
+      "path_bytes_per_cycle": {
+        "SMEM_read_reference": 128,
+        "TMEM_to_register": null,
+        "register_to_TMEM": null,
+        "TMEM_to_MMA": null,
+        "MMA_to_TMEM": null,
+        "SMEM_to_TMEM": null
+      },
+      "evidence_kind": "SMEM measured in cited research; no single verified TMEM peak imported",
+      "source": "https://arxiv.org/html/2603.05451v1"
+    },
+    {
+      "architecture": "Blackwell Ultra B300",
+      "scope": "per SM",
+      "capacity_bytes": {
+        "TMEM": 262144
+      },
+      "path_bytes_per_cycle": {
+        "SMEM_read": null,
+        "TMEM_paths": null
+      },
+      "sensitivity_baseline_not_measurement": {
+        "SMEM_read_bytes_per_cycle": 128
+      },
+      "source": "https://developer.nvidia.com/blog/inside-nvidia-blackwell-ultra-the-chip-powering-the-ai-factory-era/"
+    }
+  ],
+  "ascend_fp16_reference_budgets": [
+    {
+      "m": 16,
+      "n": 16,
+      "k": 16,
+      "peak_flops_per_cycle": 8192,
+      "ideal_compute_cycles": 1.0,
+      "a_payload_bytes": 512,
+      "b_payload_bytes": 512,
+      "a_required_bytes_per_cycle": 512.0,
+      "b_required_bytes_per_cycle": 512.0,
+      "ab_required_bytes_per_cycle": 1024.0,
+      "fp32_accumulator_bytes": 1024,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 1024.0,
+      "2201_preload": {
+        "a_service_cycles": 2.0,
+        "b_service_cycles": 4.0,
+        "parallel_independent_lower_bound_cycles": 4.0,
+        "conservative_serial_service_cycles": 6.0,
+        "serial_budget_fits_compute_window": false,
+        "warning": "Engine arbitration/latency, conversion and RAW hazards are not simulated"
+      },
+      "3510_preload": {
+        "a_service_cycles": 2.0,
+        "b_service_cycles": 2.0,
+        "parallel_independent_lower_bound_cycles": 2.0,
+        "conservative_serial_service_cycles": 4.0,
+        "serial_budget_fits_compute_window": false,
+        "warning": "Engine arbitration/latency, conversion and RAW hazards are not simulated"
+      }
+    },
+    {
+      "m": 128,
+      "n": 128,
+      "k": 64,
+      "peak_flops_per_cycle": 8192,
+      "ideal_compute_cycles": 256.0,
+      "a_payload_bytes": 16384,
+      "b_payload_bytes": 16384,
+      "a_required_bytes_per_cycle": 64.0,
+      "b_required_bytes_per_cycle": 64.0,
+      "ab_required_bytes_per_cycle": 128.0,
+      "fp32_accumulator_bytes": 65536,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 256.0,
+      "2201_preload": {
+        "a_service_cycles": 64.0,
+        "b_service_cycles": 128.0,
+        "parallel_independent_lower_bound_cycles": 128.0,
+        "conservative_serial_service_cycles": 192.0,
+        "serial_budget_fits_compute_window": true,
+        "warning": "Engine arbitration/latency, conversion and RAW hazards are not simulated"
+      },
+      "3510_preload": {
+        "a_service_cycles": 64.0,
+        "b_service_cycles": 64.0,
+        "parallel_independent_lower_bound_cycles": 64.0,
+        "conservative_serial_service_cycles": 128.0,
+        "serial_budget_fits_compute_window": true,
+        "warning": "Engine arbitration/latency, conversion and RAW hazards are not simulated"
+      }
+    },
+    {
+      "m": 128,
+      "n": 256,
+      "k": 64,
+      "peak_flops_per_cycle": 8192,
+      "ideal_compute_cycles": 512.0,
+      "a_payload_bytes": 16384,
+      "b_payload_bytes": 32768,
+      "a_required_bytes_per_cycle": 32.0,
+      "b_required_bytes_per_cycle": 64.0,
+      "ab_required_bytes_per_cycle": 96.0,
+      "fp32_accumulator_bytes": 131072,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 256.0,
+      "2201_preload": {
+        "a_service_cycles": 64.0,
+        "b_service_cycles": 256.0,
+        "parallel_independent_lower_bound_cycles": 256.0,
+        "conservative_serial_service_cycles": 320.0,
+        "serial_budget_fits_compute_window": true,
+        "warning": "Engine arbitration/latency, conversion and RAW hazards are not simulated"
+      },
+      "3510_preload": {
+        "a_service_cycles": 64.0,
+        "b_service_cycles": 128.0,
+        "parallel_independent_lower_bound_cycles": 128.0,
+        "conservative_serial_service_cycles": 192.0,
+        "serial_budget_fits_compute_window": true,
+        "warning": "Engine arbitration/latency, conversion and RAW hazards are not simulated"
+      }
+    }
+  ],
+  "nvidia_feed_budgets": [
+    {
+      "m": 64,
+      "n": 128,
+      "k": 64,
+      "peak_flops_per_cycle": 4096,
+      "ideal_compute_cycles": 256.0,
+      "a_payload_bytes": 8192,
+      "b_payload_bytes": 16384,
+      "a_required_bytes_per_cycle": 32.0,
+      "b_required_bytes_per_cycle": 64.0,
+      "ab_required_bytes_per_cycle": 96.0,
+      "fp32_accumulator_bytes": 32768,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 128.0,
+      "name": "H100 BF16 example",
+      "smem_read_reference_bytes_per_cycle": 128,
+      "read_service_cycles": 192.0,
+      "smem_budget_fraction": 0.75,
+      "maximum_compute_utilization_from_this_smem_bound": 1,
+      "scope": "Each A/B value read once at the modeled boundary; pure payload; no extra reuse, metadata or other consumers"
+    },
+    {
+      "m": 128,
+      "n": 128,
+      "k": 64,
+      "peak_flops_per_cycle": 8192,
+      "ideal_compute_cycles": 256.0,
+      "a_payload_bytes": 16384,
+      "b_payload_bytes": 16384,
+      "a_required_bytes_per_cycle": 64.0,
+      "b_required_bytes_per_cycle": 64.0,
+      "ab_required_bytes_per_cycle": 128.0,
+      "fp32_accumulator_bytes": 65536,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 256.0,
+      "name": "B200 BF16 example",
+      "smem_read_reference_bytes_per_cycle": 128,
+      "read_service_cycles": 256.0,
+      "smem_budget_fraction": 1.0,
+      "maximum_compute_utilization_from_this_smem_bound": 1,
+      "scope": "Each A/B value read once at the modeled boundary; pure payload; no extra reuse, metadata or other consumers"
+    },
+    {
+      "m": 128,
+      "n": 128,
+      "k": 64,
+      "peak_flops_per_cycle": 16384,
+      "ideal_compute_cycles": 128.0,
+      "a_payload_bytes": 8192,
+      "b_payload_bytes": 8192,
+      "a_required_bytes_per_cycle": 64.0,
+      "b_required_bytes_per_cycle": 64.0,
+      "ab_required_bytes_per_cycle": 128.0,
+      "fp32_accumulator_bytes": 65536,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 512.0,
+      "name": "B200 FP8 normalized example",
+      "smem_read_reference_bytes_per_cycle": 128,
+      "read_service_cycles": 128.0,
+      "smem_budget_fraction": 1.0,
+      "maximum_compute_utilization_from_this_smem_bound": 1,
+      "scope": "Each A/B value read once at the modeled boundary; pure payload; no extra reuse, metadata or other consumers"
+    },
+    {
+      "m": 128,
+      "n": 128,
+      "k": 64,
+      "peak_flops_per_cycle": 32768,
+      "ideal_compute_cycles": 64.0,
+      "a_payload_bytes": 4096.0,
+      "b_payload_bytes": 4096.0,
+      "a_required_bytes_per_cycle": 64.0,
+      "b_required_bytes_per_cycle": 64.0,
+      "ab_required_bytes_per_cycle": 128.0,
+      "fp32_accumulator_bytes": 65536,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 1024.0,
+      "name": "B200 FP4 1:2:4 packed-payload example",
+      "smem_read_reference_bytes_per_cycle": 128,
+      "read_service_cycles": 64.0,
+      "smem_budget_fraction": 1.0,
+      "maximum_compute_utilization_from_this_smem_bound": 1,
+      "scope": "Each A/B value read once at the modeled boundary; pure payload; no extra reuse, metadata or other consumers"
+    },
+    {
+      "m": 128,
+      "n": 128,
+      "k": 64,
+      "peak_flops_per_cycle": 49152,
+      "ideal_compute_cycles": 42.666666666666664,
+      "a_payload_bytes": 4096.0,
+      "b_payload_bytes": 4096.0,
+      "a_required_bytes_per_cycle": 96.0,
+      "b_required_bytes_per_cycle": 96.0,
+      "ab_required_bytes_per_cycle": 192.0,
+      "fp32_accumulator_bytes": 65536,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 1536.0,
+      "name": "Hypothetical FP4 1:2:6",
+      "smem_read_reference_bytes_per_cycle": 128,
+      "read_service_cycles": 64.0,
+      "smem_budget_fraction": 1.5,
+      "maximum_compute_utilization_from_this_smem_bound": 0.6666666666666666,
+      "scope": "Each A/B value read once at the modeled boundary; pure payload; no extra reuse, metadata or other consumers"
+    },
+    {
+      "m": 128,
+      "n": 128,
+      "k": 64,
+      "peak_flops_per_cycle": 65536,
+      "ideal_compute_cycles": 32.0,
+      "a_payload_bytes": 4096.0,
+      "b_payload_bytes": 4096.0,
+      "a_required_bytes_per_cycle": 128.0,
+      "b_required_bytes_per_cycle": 128.0,
+      "ab_required_bytes_per_cycle": 256.0,
+      "fp32_accumulator_bytes": 65536,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 2048.0,
+      "name": "Hypothetical FP4 1:2:8",
+      "smem_read_reference_bytes_per_cycle": 128,
+      "read_service_cycles": 64.0,
+      "smem_budget_fraction": 2.0,
+      "maximum_compute_utilization_from_this_smem_bound": 0.5,
+      "scope": "Each A/B value read once at the modeled boundary; pure payload; no extra reuse, metadata or other consumers"
+    }
+  ],
+  "ascend_3510_final_output_budgets": [
+    {
+      "m": 128,
+      "n": 128,
+      "k": 64,
+      "peak_flops_per_cycle": 8192,
+      "ideal_compute_cycles": 256.0,
+      "a_payload_bytes": 16384,
+      "b_payload_bytes": 16384,
+      "a_required_bytes_per_cycle": 64.0,
+      "b_required_bytes_per_cycle": 64.0,
+      "ab_required_bytes_per_cycle": 128.0,
+      "fp32_accumulator_bytes": 65536,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 256.0,
+      "output_path_bytes_per_cycle": 128,
+      "fp32_final_drain_service_cycles": 512.0,
+      "final_output_rate_bytes_per_compute_cycle": 256.0,
+      "scope": "Final FP32 output only; full K kept in accumulator; output route independent and overlap assumed"
+    },
+    {
+      "m": 128,
+      "n": 128,
+      "k": 256,
+      "peak_flops_per_cycle": 8192,
+      "ideal_compute_cycles": 1024.0,
+      "a_payload_bytes": 65536,
+      "b_payload_bytes": 65536,
+      "a_required_bytes_per_cycle": 64.0,
+      "b_required_bytes_per_cycle": 64.0,
+      "ab_required_bytes_per_cycle": 128.0,
+      "fp32_accumulator_bytes": 65536,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 64.0,
+      "output_path_bytes_per_cycle": 128,
+      "fp32_final_drain_service_cycles": 512.0,
+      "final_output_rate_bytes_per_compute_cycle": 64.0,
+      "scope": "Final FP32 output only; full K kept in accumulator; output route independent and overlap assumed"
+    },
+    {
+      "m": 128,
+      "n": 128,
+      "k": 4096,
+      "peak_flops_per_cycle": 8192,
+      "ideal_compute_cycles": 16384.0,
+      "a_payload_bytes": 1048576,
+      "b_payload_bytes": 1048576,
+      "a_required_bytes_per_cycle": 64.0,
+      "b_required_bytes_per_cycle": 64.0,
+      "ab_required_bytes_per_cycle": 128.0,
+      "fp32_accumulator_bytes": 65536,
+      "equivalent_fp32_bytes_per_cycle_per_direction_if_one_update": 4.0,
+      "output_path_bytes_per_cycle": 128,
+      "fp32_final_drain_service_cycles": 512.0,
+      "final_output_rate_bytes_per_compute_cycle": 4.0,
+      "scope": "Final FP32 output only; full K kept in accumulator; output route independent and overlap assumed"
+    }
+  ],
+  "assumptions": [
+    "Ideal full-tile compute at reference peak, not measured instruction latency",
+    "No bank conflicts, startup, synchronization, pipeline dependency, scale metadata or HBM limit",
+    "MMA updates do not prove physical TMEM read/write transaction counts",
+    "A 512-byte L0 row or TMEM column does not imply 512 bytes/cycle",
+    "Do not transfer a 910/A2/A3/950 or B200/B300 profile without target verification"
+  ],
+  "script_sha256": "14c7e0fde9e9d25feef7aac8f3415fa38175b719435e16072b3fde1233a2c84b"
+}

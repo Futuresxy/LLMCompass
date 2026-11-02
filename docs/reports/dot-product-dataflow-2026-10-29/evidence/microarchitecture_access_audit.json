@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-29",
+  "scope": "Read-only local profiler metadata audit, NOT B200 measurement",
+  "profiler": "Nsight Compute 2025.4.1.0",
+  "queried_chip": "gb100",
+  "visible_device": "NVIDIA GeForce RTX 4090, compute capability 8.9",
+  "commands": [
+    "ncu --query-metrics --chips gb100 --query-metrics-mode base",
+    "ncu --query-metrics --chips gb100 --query-metrics-mode suffix --metrics <selected bases>"
+  ],
+  "metrics": [
+    {
+      "name": "l1tex__data_pipe_tc_wavefronts_mem_shared_op_utcmma_matrix_a.sum",
+      "unit": "wavefront",
+      "meaning": "Tensor Core matrix A reads served by shared-memory Data-Stage"
+    },
+    {
+      "name": "l1tex__data_pipe_tc_wavefronts_mem_shared_op_utcmma_matrix_b_scope_1cta.sum",
+      "unit": "wavefront",
+      "meaning": "Tensor Core matrix B reads for 1-CTA MMA"
+    },
+    {
+      "name": "l1tex__data_pipe_tc_wavefronts_mem_shared_op_utcmma_matrix_b_scope_2cta.sum",
+      "unit": "wavefront",
+      "meaning": "Tensor Core matrix B reads for 2-CTA MMA"
+    },
+    {
+      "name": "sm__mem_tensor_reads_op_utcmma_matrix_c.sum",
+      "unit": "byte",
+      "meaning": "TMEM reads for MMA matrix C"
+    },
+    {
+      "name": "sm__mem_tensor_writes_op_utcmma.sum",
+      "unit": "byte",
+      "meaning": "TMEM writes for MMA matrix D and matrix A shift; use non-shift experiments to isolate D"
+    }
+  ],
+  "limits": [
+    "Metadata availability does not establish on-device collection permissions or counter accuracy",
+    "Cumulative counters and interval averages do not uniquely reconstruct per-cycle bank read enables",
+    "A/B wavefront counts are not automatically useful bytes; access size, bank masks and wavefront semantics need calibration",
+    "Requests and served traffic must be separated; existing ports can throttle demand into stalls",
+    "TMEM C/D counter meanings do not reveal proprietary internal SRAM bank layout",
+    "Standard LSU shared-load counters are not substitutes for the dedicated TC path counters"
+  ],
+  "sources": {
+    "collector": "https://docs.nvidia.com/cuda/parallel-thread-execution/#tcgen05-mma-instructions",
+    "profiling": "https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html",
+    "ascend": "https://github.com/Ascend/msopprof/blob/master/docs/en/user_guide/msopprof_performance_data.md"
+  },
+  "raw_sha256": {
+    "llmcompass-gb100-metrics.txt": "8acefc6f28d2fb503be31568f8bbf017884ed432d522bf02672afbf48b2acb60",
+    "llmcompass-gb100-selected-metrics.txt": "4e1ecfd855901f00078cc6b9a431932fa1d735326ca6d00a9db8a3b15d742a75"
+  }
+}

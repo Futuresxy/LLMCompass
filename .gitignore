@@ -3,3 +3,8 @@ SlurmOutput/
 temp/
 .vscode/
 *.ncu-rep
+.venv/
+.runtime/
+artifacts/llmcompass-baseline/
+artifacts/local-sram/
+artifacts/precision-ratios/

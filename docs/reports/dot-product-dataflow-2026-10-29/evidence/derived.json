@@ -1,0 +1,3282 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "kind": "analytical derivation and tiny integer MAC-coverage checks; NOT simulation",
+  "script_sha256": "96d1fa7c8826d21ac5363578256ca34a5b180d3ef0323602d00a08611be0eef6",
+  "units": {
+    "bytes": "logical useful bits / 8; no SRAM word padding or metadata",
+    "cycle": "ideal compute issue, II=1; no latency, skew, stalls, preload or drain",
+    "mac": "one scalar multiply-accumulate, not two operations"
+  },
+  "assumptions": [
+    "D=A*B with beta=0 and FP32 C/partial-sum/D paths; no initial C reads",
+    "Same R*C dot PEs and same L per compared precision; this does not assert equal hardware area",
+    "A reconfigurable fabric must support the listed spatial mappings, stationary-vector registers and partial-sum routing",
+    "No independent partitioning of unused WS/IS reduction rows; unused rows are masked",
+    "Physical FP32 pass-through of inactive rows and PE pipeline latency are not counted",
+    "OS keeps one R*C result tile in PE accumulators across all K",
+    "WS loop order n_tile,k_tile,m retains each weight tile across all M",
+    "IS loop order m_tile,k_tile,n retains each input tile across all N",
+    "WS/IS array-edge partial sums may go to registers, SRAM accumulator, or a forwarding path; only actual SRAM crossings are CACTI accesses",
+    "When materializing every partial sum in one SRAM accumulator, final D aliases that accumulator; separate D copies need explicit extra events",
+    "512 B/cycle preload is an assumed packed transfer lower bound, not a simulated PE loading network",
+    "Compute issues omit preload; additive preload+compute is still not true elapsed time",
+    "Operand SRAM refill from higher levels, cache reuse and cross-tile operand retention beyond stated loops are excluded"
+  ],
+  "gemm_256_cubed": {
+    "bf16": {
+      "gemm": {
+        "m": 256,
+        "n": 256,
+        "k": 256,
+        "beta": 0
+      },
+      "array": {
+        "rows": 16,
+        "cols": 16,
+        "dot_length": 16,
+        "issue_interval": 1,
+        "a_bits": 16,
+        "b_bits": 16,
+        "accumulator_bits": 32
+      },
+      "k_fold_span": 256,
+      "k_fold_count": 1,
+      "k_fold_valid_lengths": [
+        256
+      ],
+      "flows": {
+        "os": {
+          "dataflow": "os",
+          "loop_order": [
+            "m_tile(rows)",
+            "n_tile(cols)",
+            "k_dot_group(dot_length)"
+          ],
+          "ideal_compute_issues": 4096,
+          "useful_macs": 16777216,
+          "physical_peak_macs_per_issue": 4096,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 2097152,
+          "b_total_array_input_bytes": 2097152,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 2097152,
+          "b_stream_bytes": 2097152,
+          "a_average_stream_bytes_per_compute_issue": 512,
+          "b_average_stream_bytes_per_compute_issue": 512,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 0,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 0,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 1024,
+            "where": "PE-local FP32 accumulators",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [],
+          "spatial_mapping": {
+            "pe_row": "m",
+            "pe_col": "n",
+            "dot_lane": "k"
+          },
+          "stationary_operand": "FP32 partial sum for one output tile",
+          "nominal_full_issue_a_bytes": 512,
+          "nominal_full_issue_b_bytes": 512,
+          "whole_output_tile_bytes": 1024,
+          "writeback_burst_shape_is_not_scheduled": true,
+          "pe_accumulator_physical_bytes": 1024
+        },
+        "ws": {
+          "dataflow": "ws",
+          "loop_order": [
+            "n_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "m_stream"
+          ],
+          "ideal_compute_issues": 4096,
+          "useful_macs": 16777216,
+          "physical_peak_macs_per_issue": 4096,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 2097152,
+          "b_total_array_input_bytes": 131072,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 131072,
+          "a_stream_bytes": 2097152,
+          "b_stream_bytes": 0,
+          "a_average_stream_bytes_per_compute_issue": 512,
+          "b_average_stream_bytes_per_compute_issue": 0,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 256,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 16,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            16
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "n",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "B weight vector in each PE",
+          "full_stream_a_bytes_per_issue_by_k_fold": [
+            512
+          ],
+          "nominal_full_hardware_a_bytes_per_issue": 512,
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_weight_storage_capacity_bytes": 8192,
+          "preload_payload_per_n_tile_bytes": [
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192
+          ],
+          "useful_pe_to_pe_partial_sum_hop_bytes": 3932160
+        },
+        "is": {
+          "dataflow": "is",
+          "loop_order": [
+            "m_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "n_stream"
+          ],
+          "ideal_compute_issues": 4096,
+          "useful_macs": 16777216,
+          "physical_peak_macs_per_issue": 4096,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 131072,
+          "b_total_array_input_bytes": 2097152,
+          "a_preload_bytes": 131072,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 0,
+          "b_stream_bytes": 2097152,
+          "a_average_stream_bytes_per_compute_issue": 0,
+          "b_average_stream_bytes_per_compute_issue": 512,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 256,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 16,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            16
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "m",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "A input vector in each PE",
+          "full_stream_b_bytes_per_issue_by_k_fold": [
+            512
+          ],
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_input_storage_capacity_bytes": 8192
+        }
+      }
+    },
+    "fp8": {
+      "gemm": {
+        "m": 256,
+        "n": 256,
+        "k": 256,
+        "beta": 0
+      },
+      "array": {
+        "rows": 16,
+        "cols": 16,
+        "dot_length": 32,
+        "issue_interval": 1,
+        "a_bits": 8,
+        "b_bits": 8,
+        "accumulator_bits": 32
+      },
+      "k_fold_span": 512,
+      "k_fold_count": 1,
+      "k_fold_valid_lengths": [
+        256
+      ],
+      "flows": {
+        "os": {
+          "dataflow": "os",
+          "loop_order": [
+            "m_tile(rows)",
+            "n_tile(cols)",
+            "k_dot_group(dot_length)"
+          ],
+          "ideal_compute_issues": 2048,
+          "useful_macs": 16777216,
+          "physical_peak_macs_per_issue": 8192,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 1048576,
+          "b_total_array_input_bytes": 1048576,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 1048576,
+          "b_stream_bytes": 1048576,
+          "a_average_stream_bytes_per_compute_issue": 512,
+          "b_average_stream_bytes_per_compute_issue": 512,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 0,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 0,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 128,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 1024,
+            "where": "PE-local FP32 accumulators",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [],
+          "spatial_mapping": {
+            "pe_row": "m",
+            "pe_col": "n",
+            "dot_lane": "k"
+          },
+          "stationary_operand": "FP32 partial sum for one output tile",
+          "nominal_full_issue_a_bytes": 512,
+          "nominal_full_issue_b_bytes": 512,
+          "whole_output_tile_bytes": 1024,
+          "writeback_burst_shape_is_not_scheduled": true,
+          "pe_accumulator_physical_bytes": 1024
+        },
+        "ws": {
+          "dataflow": "ws",
+          "loop_order": [
+            "n_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "m_stream"
+          ],
+          "ideal_compute_issues": 4096,
+          "useful_macs": 16777216,
+          "physical_peak_macs_per_issue": 8192,
+          "mapping_utilization": 0.5,
+          "a_total_array_input_bytes": 1048576,
+          "b_total_array_input_bytes": 65536,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 65536,
+          "a_stream_bytes": 1048576,
+          "b_stream_bytes": 0,
+          "a_average_stream_bytes_per_compute_issue": 256,
+          "b_average_stream_bytes_per_compute_issue": 0,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 128,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 16,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            8
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "n",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "B weight vector in each PE",
+          "full_stream_a_bytes_per_issue_by_k_fold": [
+            256
+          ],
+          "nominal_full_hardware_a_bytes_per_issue": 512,
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_weight_storage_capacity_bytes": 8192,
+          "preload_payload_per_n_tile_bytes": [
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096,
+            4096
+          ],
+          "useful_pe_to_pe_partial_sum_hop_bytes": 1835008
+        },
+        "is": {
+          "dataflow": "is",
+          "loop_order": [
+            "m_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "n_stream"
+          ],
+          "ideal_compute_issues": 4096,
+          "useful_macs": 16777216,
+          "physical_peak_macs_per_issue": 8192,
+          "mapping_utilization": 0.5,
+          "a_total_array_input_bytes": 65536,
+          "b_total_array_input_bytes": 1048576,
+          "a_preload_bytes": 65536,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 0,
+          "b_stream_bytes": 1048576,
+          "a_average_stream_bytes_per_compute_issue": 0,
+          "b_average_stream_bytes_per_compute_issue": 256,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 128,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 16,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            8
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "m",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "A input vector in each PE",
+          "full_stream_b_bytes_per_issue_by_k_fold": [
+            256
+          ],
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_input_storage_capacity_bytes": 8192
+        }
+      }
+    },
+    "fp4": {
+      "gemm": {
+        "m": 256,
+        "n": 256,
+        "k": 256,
+        "beta": 0
+      },
+      "array": {
+        "rows": 16,
+        "cols": 16,
+        "dot_length": 64,
+        "issue_interval": 1,
+        "a_bits": 4,
+        "b_bits": 4,
+        "accumulator_bits": 32
+      },
+      "k_fold_span": 1024,
+      "k_fold_count": 1,
+      "k_fold_valid_lengths": [
+        256
+      ],
+      "flows": {
+        "os": {
+          "dataflow": "os",
+          "loop_order": [
+            "m_tile(rows)",
+            "n_tile(cols)",
+            "k_dot_group(dot_length)"
+          ],
+          "ideal_compute_issues": 1024,
+          "useful_macs": 16777216,
+          "physical_peak_macs_per_issue": 16384,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 524288,
+          "b_total_array_input_bytes": 524288,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 524288,
+          "b_stream_bytes": 524288,
+          "a_average_stream_bytes_per_compute_issue": 512,
+          "b_average_stream_bytes_per_compute_issue": 512,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 0,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 0,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 256,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 1024,
+            "where": "PE-local FP32 accumulators",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [],
+          "spatial_mapping": {
+            "pe_row": "m",
+            "pe_col": "n",
+            "dot_lane": "k"
+          },
+          "stationary_operand": "FP32 partial sum for one output tile",
+          "nominal_full_issue_a_bytes": 512,
+          "nominal_full_issue_b_bytes": 512,
+          "whole_output_tile_bytes": 1024,
+          "writeback_burst_shape_is_not_scheduled": true,
+          "pe_accumulator_physical_bytes": 1024
+        },
+        "ws": {
+          "dataflow": "ws",
+          "loop_order": [
+            "n_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "m_stream"
+          ],
+          "ideal_compute_issues": 4096,
+          "useful_macs": 16777216,
+          "physical_peak_macs_per_issue": 16384,
+          "mapping_utilization": 0.25,
+          "a_total_array_input_bytes": 524288,
+          "b_total_array_input_bytes": 32768,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 32768,
+          "a_stream_bytes": 524288,
+          "b_stream_bytes": 0,
+          "a_average_stream_bytes_per_compute_issue": 128,
+          "b_average_stream_bytes_per_compute_issue": 0,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 64,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 16,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            4
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "n",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "B weight vector in each PE",
+          "full_stream_a_bytes_per_issue_by_k_fold": [
+            128
+          ],
+          "nominal_full_hardware_a_bytes_per_issue": 512,
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_weight_storage_capacity_bytes": 8192,
+          "preload_payload_per_n_tile_bytes": [
+            2048,
+            2048,
+            2048,
+            2048,
+            2048,
+            2048,
+            2048,
+            2048,
+            2048,
+            2048,
+            2048,
+            2048,
+            2048,
+            2048,
+            2048,
+            2048
+          ],
+          "useful_pe_to_pe_partial_sum_hop_bytes": 786432
+        },
+        "is": {
+          "dataflow": "is",
+          "loop_order": [
+            "m_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "n_stream"
+          ],
+          "ideal_compute_issues": 4096,
+          "useful_macs": 16777216,
+          "physical_peak_macs_per_issue": 16384,
+          "mapping_utilization": 0.25,
+          "a_total_array_input_bytes": 32768,
+          "b_total_array_input_bytes": 524288,
+          "a_preload_bytes": 32768,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 0,
+          "b_stream_bytes": 524288,
+          "a_average_stream_bytes_per_compute_issue": 0,
+          "b_average_stream_bytes_per_compute_issue": 128,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 64,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 16,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            4
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "m",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "A input vector in each PE",
+          "full_stream_b_bytes_per_issue_by_k_fold": [
+            128
+          ],
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_input_storage_capacity_bytes": 8192
+        }
+      }
+    }
+  },
+  "gemm_256_256_4096": {
+    "bf16": {
+      "gemm": {
+        "m": 256,
+        "n": 256,
+        "k": 4096,
+        "beta": 0
+      },
+      "array": {
+        "rows": 16,
+        "cols": 16,
+        "dot_length": 16,
+        "issue_interval": 1,
+        "a_bits": 16,
+        "b_bits": 16,
+        "accumulator_bits": 32
+      },
+      "k_fold_span": 256,
+      "k_fold_count": 16,
+      "k_fold_valid_lengths": [
+        256,
+        256,
+        256,
+        256,
+        256,
+        256,
+        256,
+        256,
+        256,
+        256,
+        256,
+        256,
+        256,
+        256,
+        256,
+        256
+      ],
+      "flows": {
+        "os": {
+          "dataflow": "os",
+          "loop_order": [
+            "m_tile(rows)",
+            "n_tile(cols)",
+            "k_dot_group(dot_length)"
+          ],
+          "ideal_compute_issues": 65536,
+          "useful_macs": 268435456,
+          "physical_peak_macs_per_issue": 4096,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 33554432,
+          "b_total_array_input_bytes": 33554432,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 33554432,
+          "b_stream_bytes": 33554432,
+          "a_average_stream_bytes_per_compute_issue": 512,
+          "b_average_stream_bytes_per_compute_issue": 512,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 0,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 0,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 4,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 1024,
+            "where": "PE-local FP32 accumulators",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [],
+          "spatial_mapping": {
+            "pe_row": "m",
+            "pe_col": "n",
+            "dot_lane": "k"
+          },
+          "stationary_operand": "FP32 partial sum for one output tile",
+          "nominal_full_issue_a_bytes": 512,
+          "nominal_full_issue_b_bytes": 512,
+          "whole_output_tile_bytes": 1024,
+          "writeback_burst_shape_is_not_scheduled": true,
+          "pe_accumulator_physical_bytes": 1024
+        },
+        "ws": {
+          "dataflow": "ws",
+          "loop_order": [
+            "n_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "m_stream"
+          ],
+          "ideal_compute_issues": 65536,
+          "useful_macs": 268435456,
+          "physical_peak_macs_per_issue": 4096,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 33554432,
+          "b_total_array_input_bytes": 2097152,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 2097152,
+          "a_stream_bytes": 33554432,
+          "b_stream_bytes": 0,
+          "a_average_stream_bytes_per_compute_issue": 512,
+          "b_average_stream_bytes_per_compute_issue": 0,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 4096,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 256,
+          "array_result_emissions": 1048576,
+          "array_result_emission_bytes": 4194304,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 3932160,
+            "write_bytes": 4194304,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 16384,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "n",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "B weight vector in each PE",
+          "full_stream_a_bytes_per_issue_by_k_fold": [
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512
+          ],
+          "nominal_full_hardware_a_bytes_per_issue": 512,
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_weight_storage_capacity_bytes": 8192,
+          "preload_payload_per_n_tile_bytes": [
+            131072,
+            131072,
+            131072,
+            131072,
+            131072,
+            131072,
+            131072,
+            131072,
+            131072,
+            131072,
+            131072,
+            131072,
+            131072,
+            131072,
+            131072,
+            131072
+          ],
+          "useful_pe_to_pe_partial_sum_hop_bytes": 62914560
+        },
+        "is": {
+          "dataflow": "is",
+          "loop_order": [
+            "m_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "n_stream"
+          ],
+          "ideal_compute_issues": 65536,
+          "useful_macs": 268435456,
+          "physical_peak_macs_per_issue": 4096,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 2097152,
+          "b_total_array_input_bytes": 33554432,
+          "a_preload_bytes": 2097152,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 0,
+          "b_stream_bytes": 33554432,
+          "a_average_stream_bytes_per_compute_issue": 0,
+          "b_average_stream_bytes_per_compute_issue": 512,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 4096,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 256,
+          "array_result_emissions": 1048576,
+          "array_result_emission_bytes": 4194304,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 3932160,
+            "write_bytes": 4194304,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 16384,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "m",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "A input vector in each PE",
+          "full_stream_b_bytes_per_issue_by_k_fold": [
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512
+          ],
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_input_storage_capacity_bytes": 8192
+        }
+      }
+    },
+    "fp8": {
+      "gemm": {
+        "m": 256,
+        "n": 256,
+        "k": 4096,
+        "beta": 0
+      },
+      "array": {
+        "rows": 16,
+        "cols": 16,
+        "dot_length": 32,
+        "issue_interval": 1,
+        "a_bits": 8,
+        "b_bits": 8,
+        "accumulator_bits": 32
+      },
+      "k_fold_span": 512,
+      "k_fold_count": 8,
+      "k_fold_valid_lengths": [
+        512,
+        512,
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "flows": {
+        "os": {
+          "dataflow": "os",
+          "loop_order": [
+            "m_tile(rows)",
+            "n_tile(cols)",
+            "k_dot_group(dot_length)"
+          ],
+          "ideal_compute_issues": 32768,
+          "useful_macs": 268435456,
+          "physical_peak_macs_per_issue": 8192,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 16777216,
+          "b_total_array_input_bytes": 16777216,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 16777216,
+          "b_stream_bytes": 16777216,
+          "a_average_stream_bytes_per_compute_issue": 512,
+          "b_average_stream_bytes_per_compute_issue": 512,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 0,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 0,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 8,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 1024,
+            "where": "PE-local FP32 accumulators",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [],
+          "spatial_mapping": {
+            "pe_row": "m",
+            "pe_col": "n",
+            "dot_lane": "k"
+          },
+          "stationary_operand": "FP32 partial sum for one output tile",
+          "nominal_full_issue_a_bytes": 512,
+          "nominal_full_issue_b_bytes": 512,
+          "whole_output_tile_bytes": 1024,
+          "writeback_burst_shape_is_not_scheduled": true,
+          "pe_accumulator_physical_bytes": 1024
+        },
+        "ws": {
+          "dataflow": "ws",
+          "loop_order": [
+            "n_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "m_stream"
+          ],
+          "ideal_compute_issues": 32768,
+          "useful_macs": 268435456,
+          "physical_peak_macs_per_issue": 8192,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 16777216,
+          "b_total_array_input_bytes": 1048576,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 1048576,
+          "a_stream_bytes": 16777216,
+          "b_stream_bytes": 0,
+          "a_average_stream_bytes_per_compute_issue": 512,
+          "b_average_stream_bytes_per_compute_issue": 0,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 2048,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 128,
+          "array_result_emissions": 524288,
+          "array_result_emission_bytes": 2097152,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 1835008,
+            "write_bytes": 2097152,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 16384,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "n",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "B weight vector in each PE",
+          "full_stream_a_bytes_per_issue_by_k_fold": [
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512
+          ],
+          "nominal_full_hardware_a_bytes_per_issue": 512,
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_weight_storage_capacity_bytes": 8192,
+          "preload_payload_per_n_tile_bytes": [
+            65536,
+            65536,
+            65536,
+            65536,
+            65536,
+            65536,
+            65536,
+            65536,
+            65536,
+            65536,
+            65536,
+            65536,
+            65536,
+            65536,
+            65536,
+            65536
+          ],
+          "useful_pe_to_pe_partial_sum_hop_bytes": 31457280
+        },
+        "is": {
+          "dataflow": "is",
+          "loop_order": [
+            "m_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "n_stream"
+          ],
+          "ideal_compute_issues": 32768,
+          "useful_macs": 268435456,
+          "physical_peak_macs_per_issue": 8192,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 1048576,
+          "b_total_array_input_bytes": 16777216,
+          "a_preload_bytes": 1048576,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 0,
+          "b_stream_bytes": 16777216,
+          "a_average_stream_bytes_per_compute_issue": 0,
+          "b_average_stream_bytes_per_compute_issue": 512,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 2048,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 128,
+          "array_result_emissions": 524288,
+          "array_result_emission_bytes": 2097152,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 1835008,
+            "write_bytes": 2097152,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 16384,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16,
+            16
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "m",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "A input vector in each PE",
+          "full_stream_b_bytes_per_issue_by_k_fold": [
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512,
+            512
+          ],
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_input_storage_capacity_bytes": 8192
+        }
+      }
+    },
+    "fp4": {
+      "gemm": {
+        "m": 256,
+        "n": 256,
+        "k": 4096,
+        "beta": 0
+      },
+      "array": {
+        "rows": 16,
+        "cols": 16,
+        "dot_length": 64,
+        "issue_interval": 1,
+        "a_bits": 4,
+        "b_bits": 4,
+        "accumulator_bits": 32
+      },
+      "k_fold_span": 1024,
+      "k_fold_count": 4,
+      "k_fold_valid_lengths": [
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "flows": {
+        "os": {
+          "dataflow": "os",
+          "loop_order": [
+            "m_tile(rows)",
+            "n_tile(cols)",
+            "k_dot_group(dot_length)"
+          ],
+          "ideal_compute_issues": 16384,
+          "useful_macs": 268435456,
+          "physical_peak_macs_per_issue": 16384,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 8388608,
+          "b_total_array_input_bytes": 8388608,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 8388608,
+          "b_stream_bytes": 8388608,
+          "a_average_stream_bytes_per_compute_issue": 512,
+          "b_average_stream_bytes_per_compute_issue": 512,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 0,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 0,
+          "array_result_emissions": 65536,
+          "array_result_emission_bytes": 262144,
+          "average_array_output_bytes_per_compute_issue": 16,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 0,
+            "write_bytes": 262144,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 0,
+            "logical_result_working_set_bytes": 1024,
+            "where": "PE-local FP32 accumulators",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [],
+          "spatial_mapping": {
+            "pe_row": "m",
+            "pe_col": "n",
+            "dot_lane": "k"
+          },
+          "stationary_operand": "FP32 partial sum for one output tile",
+          "nominal_full_issue_a_bytes": 512,
+          "nominal_full_issue_b_bytes": 512,
+          "whole_output_tile_bytes": 1024,
+          "writeback_burst_shape_is_not_scheduled": true,
+          "pe_accumulator_physical_bytes": 1024
+        },
+        "ws": {
+          "dataflow": "ws",
+          "loop_order": [
+            "n_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "m_stream"
+          ],
+          "ideal_compute_issues": 16384,
+          "useful_macs": 268435456,
+          "physical_peak_macs_per_issue": 16384,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 8388608,
+          "b_total_array_input_bytes": 524288,
+          "a_preload_bytes": 0,
+          "b_preload_bytes": 524288,
+          "a_stream_bytes": 8388608,
+          "b_stream_bytes": 0,
+          "a_average_stream_bytes_per_compute_issue": 512,
+          "b_average_stream_bytes_per_compute_issue": 0,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 1024,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 64,
+          "array_result_emissions": 262144,
+          "array_result_emission_bytes": 1048576,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 786432,
+            "write_bytes": 1048576,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 16384,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            16,
+            16,
+            16,
+            16
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "n",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "B weight vector in each PE",
+          "full_stream_a_bytes_per_issue_by_k_fold": [
+            512,
+            512,
+            512,
+            512
+          ],
+          "nominal_full_hardware_a_bytes_per_issue": 512,
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_weight_storage_capacity_bytes": 8192,
+          "preload_payload_per_n_tile_bytes": [
+            32768,
+            32768,
+            32768,
+            32768,
+            32768,
+            32768,
+            32768,
+            32768,
+            32768,
+            32768,
+            32768,
+            32768,
+            32768,
+            32768,
+            32768,
+            32768
+          ],
+          "useful_pe_to_pe_partial_sum_hop_bytes": 15728640
+        },
+        "is": {
+          "dataflow": "is",
+          "loop_order": [
+            "m_tile(cols)",
+            "k_tile(rows*dot_length)",
+            "n_stream"
+          ],
+          "ideal_compute_issues": 16384,
+          "useful_macs": 268435456,
+          "physical_peak_macs_per_issue": 16384,
+          "mapping_utilization": 1,
+          "a_total_array_input_bytes": 524288,
+          "b_total_array_input_bytes": 8388608,
+          "a_preload_bytes": 524288,
+          "b_preload_bytes": 0,
+          "a_stream_bytes": 0,
+          "b_stream_bytes": 8388608,
+          "a_average_stream_bytes_per_compute_issue": 0,
+          "b_average_stream_bytes_per_compute_issue": 512,
+          "preload_interface_bytes_per_cycle_assumed": 512,
+          "preload_transfer_cycles_lower_bound": 1024,
+          "preload_is_excluded_from_compute_issues": true,
+          "preload_phase_count": 64,
+          "array_result_emissions": 262144,
+          "array_result_emission_bytes": 1048576,
+          "average_array_output_bytes_per_compute_issue": 64,
+          "final_d_elements": 65536,
+          "final_d_bytes": 262144,
+          "initial_c_read_bytes": 0,
+          "sram_accumulator_if_every_emission_is_materialized": {
+            "read_bytes": 786432,
+            "write_bytes": 1048576,
+            "final_d_aliases_accumulator": true,
+            "extra_final_d_copy_bytes": 0
+          },
+          "resident_accumulator_policy": {
+            "sram_initial_c_read_bytes": 0,
+            "sram_final_d_write_bytes": 262144,
+            "cross_k_state_working_set_bytes": 16384,
+            "logical_result_working_set_bytes": 16384,
+            "where": "external result accumulator",
+            "state_and_update_cost_is_additional_to_operand_sram": true
+          },
+          "active_reduction_rows_by_k_fold": [
+            16,
+            16,
+            16,
+            16
+          ],
+          "spatial_mapping": {
+            "pe_row": "k_dot_group",
+            "pe_col": "m",
+            "dot_lane": "k_within_dot_group"
+          },
+          "stationary_operand": "A input vector in each PE",
+          "full_stream_b_bytes_per_issue_by_k_fold": [
+            512,
+            512,
+            512,
+            512
+          ],
+          "steady_array_output_upper_bound_bytes_per_issue": 64,
+          "pe_input_storage_capacity_bytes": 8192
+        }
+      }
+    }
+  },
+  "matched_fp4_64_16_1024": {
+    "gemm": {
+      "m": 64,
+      "n": 16,
+      "k": 1024,
+      "beta": 0
+    },
+    "array": {
+      "rows": 16,
+      "cols": 16,
+      "dot_length": 64,
+      "issue_interval": 1,
+      "a_bits": 4,
+      "b_bits": 4,
+      "accumulator_bits": 32
+    },
+    "k_fold_span": 1024,
+    "k_fold_count": 1,
+    "k_fold_valid_lengths": [
+      1024
+    ],
+    "flows": {
+      "os": {
+        "dataflow": "os",
+        "loop_order": [
+          "m_tile(rows)",
+          "n_tile(cols)",
+          "k_dot_group(dot_length)"
+        ],
+        "ideal_compute_issues": 64,
+        "useful_macs": 1048576,
+        "physical_peak_macs_per_issue": 16384,
+        "mapping_utilization": 1,
+        "a_total_array_input_bytes": 32768,
+        "b_total_array_input_bytes": 32768,
+        "a_preload_bytes": 0,
+        "b_preload_bytes": 0,
+        "a_stream_bytes": 32768,
+        "b_stream_bytes": 32768,
+        "a_average_stream_bytes_per_compute_issue": 512,
+        "b_average_stream_bytes_per_compute_issue": 512,
+        "preload_interface_bytes_per_cycle_assumed": 512,
+        "preload_transfer_cycles_lower_bound": 0,
+        "preload_is_excluded_from_compute_issues": true,
+        "preload_phase_count": 0,
+        "array_result_emissions": 1024,
+        "array_result_emission_bytes": 4096,
+        "average_array_output_bytes_per_compute_issue": 64,
+        "final_d_elements": 1024,
+        "final_d_bytes": 4096,
+        "initial_c_read_bytes": 0,
+        "sram_accumulator_if_every_emission_is_materialized": {
+          "read_bytes": 0,
+          "write_bytes": 4096,
+          "final_d_aliases_accumulator": true,
+          "extra_final_d_copy_bytes": 0
+        },
+        "resident_accumulator_policy": {
+          "sram_initial_c_read_bytes": 0,
+          "sram_final_d_write_bytes": 4096,
+          "cross_k_state_working_set_bytes": 0,
+          "logical_result_working_set_bytes": 1024,
+          "where": "PE-local FP32 accumulators",
+          "state_and_update_cost_is_additional_to_operand_sram": true
+        },
+        "active_reduction_rows_by_k_fold": [],
+        "spatial_mapping": {
+          "pe_row": "m",
+          "pe_col": "n",
+          "dot_lane": "k"
+        },
+        "stationary_operand": "FP32 partial sum for one output tile",
+        "nominal_full_issue_a_bytes": 512,
+        "nominal_full_issue_b_bytes": 512,
+        "whole_output_tile_bytes": 1024,
+        "writeback_burst_shape_is_not_scheduled": true,
+        "pe_accumulator_physical_bytes": 1024
+      },
+      "ws": {
+        "dataflow": "ws",
+        "loop_order": [
+          "n_tile(cols)",
+          "k_tile(rows*dot_length)",
+          "m_stream"
+        ],
+        "ideal_compute_issues": 64,
+        "useful_macs": 1048576,
+        "physical_peak_macs_per_issue": 16384,
+        "mapping_utilization": 1,
+        "a_total_array_input_bytes": 32768,
+        "b_total_array_input_bytes": 8192,
+        "a_preload_bytes": 0,
+        "b_preload_bytes": 8192,
+        "a_stream_bytes": 32768,
+        "b_stream_bytes": 0,
+        "a_average_stream_bytes_per_compute_issue": 512,
+        "b_average_stream_bytes_per_compute_issue": 0,
+        "preload_interface_bytes_per_cycle_assumed": 512,
+        "preload_transfer_cycles_lower_bound": 16,
+        "preload_is_excluded_from_compute_issues": true,
+        "preload_phase_count": 1,
+        "array_result_emissions": 1024,
+        "array_result_emission_bytes": 4096,
+        "average_array_output_bytes_per_compute_issue": 64,
+        "final_d_elements": 1024,
+        "final_d_bytes": 4096,
+        "initial_c_read_bytes": 0,
+        "sram_accumulator_if_every_emission_is_materialized": {
+          "read_bytes": 0,
+          "write_bytes": 4096,
+          "final_d_aliases_accumulator": true,
+          "extra_final_d_copy_bytes": 0
+        },
+        "resident_accumulator_policy": {
+          "sram_initial_c_read_bytes": 0,
+          "sram_final_d_write_bytes": 4096,
+          "cross_k_state_working_set_bytes": 0,
+          "logical_result_working_set_bytes": 4096,
+          "where": "external result accumulator",
+          "state_and_update_cost_is_additional_to_operand_sram": true
+        },
+        "active_reduction_rows_by_k_fold": [
+          16
+        ],
+        "spatial_mapping": {
+          "pe_row": "k_dot_group",
+          "pe_col": "n",
+          "dot_lane": "k_within_dot_group"
+        },
+        "stationary_operand": "B weight vector in each PE",
+        "full_stream_a_bytes_per_issue_by_k_fold": [
+          512
+        ],
+        "nominal_full_hardware_a_bytes_per_issue": 512,
+        "steady_array_output_upper_bound_bytes_per_issue": 64,
+        "pe_weight_storage_capacity_bytes": 8192,
+        "preload_payload_per_n_tile_bytes": [
+          8192
+        ],
+        "useful_pe_to_pe_partial_sum_hop_bytes": 61440
+      },
+      "is": {
+        "dataflow": "is",
+        "loop_order": [
+          "m_tile(cols)",
+          "k_tile(rows*dot_length)",
+          "n_stream"
+        ],
+        "ideal_compute_issues": 64,
+        "useful_macs": 1048576,
+        "physical_peak_macs_per_issue": 16384,
+        "mapping_utilization": 1,
+        "a_total_array_input_bytes": 32768,
+        "b_total_array_input_bytes": 32768,
+        "a_preload_bytes": 32768,
+        "b_preload_bytes": 0,
+        "a_stream_bytes": 0,
+        "b_stream_bytes": 32768,
+        "a_average_stream_bytes_per_compute_issue": 0,
+        "b_average_stream_bytes_per_compute_issue": 512,
+        "preload_interface_bytes_per_cycle_assumed": 512,
+        "preload_transfer_cycles_lower_bound": 64,
+        "preload_is_excluded_from_compute_issues": true,
+        "preload_phase_count": 4,
+        "array_result_emissions": 1024,
+        "array_result_emission_bytes": 4096,
+        "average_array_output_bytes_per_compute_issue": 64,
+        "final_d_elements": 1024,
+        "final_d_bytes": 4096,
+        "initial_c_read_bytes": 0,
+        "sram_accumulator_if_every_emission_is_materialized": {
+          "read_bytes": 0,
+          "write_bytes": 4096,
+          "final_d_aliases_accumulator": true,
+          "extra_final_d_copy_bytes": 0
+        },
+        "resident_accumulator_policy": {
+          "sram_initial_c_read_bytes": 0,
+          "sram_final_d_write_bytes": 4096,
+          "cross_k_state_working_set_bytes": 0,
+          "logical_result_working_set_bytes": 1024,
+          "where": "external result accumulator",
+          "state_and_update_cost_is_additional_to_operand_sram": true
+        },
+        "active_reduction_rows_by_k_fold": [
+          16
+        ],
+        "spatial_mapping": {
+          "pe_row": "k_dot_group",
+          "pe_col": "m",
+          "dot_lane": "k_within_dot_group"
+        },
+        "stationary_operand": "A input vector in each PE",
+        "full_stream_b_bytes_per_issue_by_k_fold": [
+          512
+        ],
+        "steady_array_output_upper_bound_bytes_per_issue": 64,
+        "pe_input_storage_capacity_bytes": 8192
+      }
+    }
+  },
+  "four_profiles_k256_underfill": [
+    {
+      "profile": "1:2:4",
+      "precision": "bf16",
+      "dot_length": 16,
+      "active_reduction_rows": 16,
+      "last_active_row_valid_dot_lanes": 16,
+      "ws_mapping_utilization": 1,
+      "os_mapping_utilization": 1,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 4096,
+      "ws_stream_a_bytes_per_issue": 512,
+      "nominal_full_hardware_a_bytes_per_issue": 512
+    },
+    {
+      "profile": "1:2:4",
+      "precision": "fp8",
+      "dot_length": 32,
+      "active_reduction_rows": 8,
+      "last_active_row_valid_dot_lanes": 32,
+      "ws_mapping_utilization": 0.5,
+      "os_mapping_utilization": 1,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 2048,
+      "ws_stream_a_bytes_per_issue": 256,
+      "nominal_full_hardware_a_bytes_per_issue": 512
+    },
+    {
+      "profile": "1:2:4",
+      "precision": "fp4",
+      "dot_length": 64,
+      "active_reduction_rows": 4,
+      "last_active_row_valid_dot_lanes": 64,
+      "ws_mapping_utilization": 0.25,
+      "os_mapping_utilization": 1,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 1024,
+      "ws_stream_a_bytes_per_issue": 128,
+      "nominal_full_hardware_a_bytes_per_issue": 512
+    },
+    {
+      "profile": "1:2:6",
+      "precision": "bf16",
+      "dot_length": 16,
+      "active_reduction_rows": 16,
+      "last_active_row_valid_dot_lanes": 16,
+      "ws_mapping_utilization": 1,
+      "os_mapping_utilization": 1,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 4096,
+      "ws_stream_a_bytes_per_issue": 512,
+      "nominal_full_hardware_a_bytes_per_issue": 512
+    },
+    {
+      "profile": "1:2:6",
+      "precision": "fp8",
+      "dot_length": 32,
+      "active_reduction_rows": 8,
+      "last_active_row_valid_dot_lanes": 32,
+      "ws_mapping_utilization": 0.5,
+      "os_mapping_utilization": 1,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 2048,
+      "ws_stream_a_bytes_per_issue": 256,
+      "nominal_full_hardware_a_bytes_per_issue": 512
+    },
+    {
+      "profile": "1:2:6",
+      "precision": "fp4",
+      "dot_length": 96,
+      "active_reduction_rows": 3,
+      "last_active_row_valid_dot_lanes": 64,
+      "ws_mapping_utilization": 0.16666666666666666,
+      "os_mapping_utilization": 0.8888888888888888,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 768,
+      "ws_stream_a_bytes_per_issue": 128,
+      "nominal_full_hardware_a_bytes_per_issue": 768
+    },
+    {
+      "profile": "1:2:8",
+      "precision": "bf16",
+      "dot_length": 16,
+      "active_reduction_rows": 16,
+      "last_active_row_valid_dot_lanes": 16,
+      "ws_mapping_utilization": 1,
+      "os_mapping_utilization": 1,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 4096,
+      "ws_stream_a_bytes_per_issue": 512,
+      "nominal_full_hardware_a_bytes_per_issue": 512
+    },
+    {
+      "profile": "1:2:8",
+      "precision": "fp8",
+      "dot_length": 32,
+      "active_reduction_rows": 8,
+      "last_active_row_valid_dot_lanes": 32,
+      "ws_mapping_utilization": 0.5,
+      "os_mapping_utilization": 1,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 2048,
+      "ws_stream_a_bytes_per_issue": 256,
+      "nominal_full_hardware_a_bytes_per_issue": 512
+    },
+    {
+      "profile": "1:2:8",
+      "precision": "fp4",
+      "dot_length": 128,
+      "active_reduction_rows": 2,
+      "last_active_row_valid_dot_lanes": 128,
+      "ws_mapping_utilization": 0.125,
+      "os_mapping_utilization": 1,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 512,
+      "ws_stream_a_bytes_per_issue": 128,
+      "nominal_full_hardware_a_bytes_per_issue": 1024
+    },
+    {
+      "profile": "1:4:8",
+      "precision": "bf16",
+      "dot_length": 16,
+      "active_reduction_rows": 16,
+      "last_active_row_valid_dot_lanes": 16,
+      "ws_mapping_utilization": 1,
+      "os_mapping_utilization": 1,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 4096,
+      "ws_stream_a_bytes_per_issue": 512,
+      "nominal_full_hardware_a_bytes_per_issue": 512
+    },
+    {
+      "profile": "1:4:8",
+      "precision": "fp8",
+      "dot_length": 64,
+      "active_reduction_rows": 4,
+      "last_active_row_valid_dot_lanes": 64,
+      "ws_mapping_utilization": 0.25,
+      "os_mapping_utilization": 1,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 1024,
+      "ws_stream_a_bytes_per_issue": 256,
+      "nominal_full_hardware_a_bytes_per_issue": 1024
+    },
+    {
+      "profile": "1:4:8",
+      "precision": "fp4",
+      "dot_length": 128,
+      "active_reduction_rows": 2,
+      "last_active_row_valid_dot_lanes": 128,
+      "ws_mapping_utilization": 0.125,
+      "os_mapping_utilization": 1,
+      "ws_compute_issues": 4096,
+      "os_compute_issues": 512,
+      "ws_stream_a_bytes_per_issue": 128,
+      "nominal_full_hardware_a_bytes_per_issue": 1024
+    }
+  ],
+  "fixed_dtype_growth": {
+    "scope": "Same FP4 dtype, M=N=256,K=4096; full mapping, II=1; no preload overlap/timing",
+    "core_comparison_ws": [
+      {
+        "variant": "baseline",
+        "ideal_compute_issues": 16384,
+        "a_stream_bytes_per_issue": 512,
+        "array_partial_output_bytes_per_issue": 64,
+        "k_folds": 4,
+        "accumulator_sram_write_bytes": 1048576,
+        "accumulator_sram_read_bytes": 786432,
+        "final_d_bytes": 262144,
+        "final_d_average_bytes_per_compute_issue": 16,
+        "b_sram_preload_read_bytes_min": 524288,
+        "b_sram_preload_read_bytes_max": 524288
+      },
+      {
+        "variant": "double_dot_k_length",
+        "ideal_compute_issues": 8192,
+        "a_stream_bytes_per_issue": 1024,
+        "array_partial_output_bytes_per_issue": 64,
+        "k_folds": 2,
+        "accumulator_sram_write_bytes": 524288,
+        "accumulator_sram_read_bytes": 262144,
+        "final_d_bytes": 262144,
+        "final_d_average_bytes_per_compute_issue": 32,
+        "b_sram_preload_read_bytes_min": 524288,
+        "b_sram_preload_read_bytes_max": 524288
+      },
+      {
+        "variant": "double_pe_columns",
+        "ideal_compute_issues": 8192,
+        "a_stream_bytes_per_issue": 512,
+        "array_partial_output_bytes_per_issue": 128,
+        "k_folds": 4,
+        "accumulator_sram_write_bytes": 1048576,
+        "accumulator_sram_read_bytes": 786432,
+        "final_d_bytes": 262144,
+        "final_d_average_bytes_per_compute_issue": 32,
+        "b_sram_preload_read_bytes_min": 524288,
+        "b_sram_preload_read_bytes_max": 524288
+      },
+      {
+        "variant": "double_m_via_independent_ws_groups",
+        "ideal_compute_issues": 8192,
+        "a_stream_bytes_per_issue": 1024,
+        "array_partial_output_bytes_per_issue": 128,
+        "k_folds": 4,
+        "accumulator_sram_write_bytes": 1048576,
+        "accumulator_sram_read_bytes": 786432,
+        "final_d_bytes": 262144,
+        "final_d_average_bytes_per_compute_issue": 32,
+        "b_sram_preload_read_bytes_min": 524288,
+        "b_sram_preload_read_bytes_max": 1048576
+      }
+    ],
+    "core_comparison_os": [
+      {
+        "variant": "baseline",
+        "ideal_compute_issues": 16384,
+        "a_stream_bytes_per_issue": 512,
+        "b_stream_bytes_per_issue": 512,
+        "pe_fp32_accumulator_bytes": 1024,
+        "final_d_bytes": 262144,
+        "final_d_average_bytes_per_compute_issue": 16
+      },
+      {
+        "variant": "double_dot_k_length",
+        "ideal_compute_issues": 8192,
+        "a_stream_bytes_per_issue": 1024,
+        "b_stream_bytes_per_issue": 1024,
+        "pe_fp32_accumulator_bytes": 1024,
+        "final_d_bytes": 262144,
+        "final_d_average_bytes_per_compute_issue": 32
+      },
+      {
+        "variant": "double_pe_columns",
+        "ideal_compute_issues": 8192,
+        "a_stream_bytes_per_issue": 512,
+        "b_stream_bytes_per_issue": 1024,
+        "pe_fp32_accumulator_bytes": 2048,
+        "final_d_bytes": 262144,
+        "final_d_average_bytes_per_compute_issue": 32
+      },
+      {
+        "variant": "double_pe_rows",
+        "ideal_compute_issues": 8192,
+        "a_stream_bytes_per_issue": 1024,
+        "b_stream_bytes_per_issue": 512,
+        "pe_fp32_accumulator_bytes": 2048,
+        "final_d_bytes": 262144,
+        "final_d_average_bytes_per_compute_issue": 32
+      }
+    ],
+    "symbolic_growth": {
+      "definition": "(R,C,L) -> (uR,vC,wL), fixed dtype and clock",
+      "physical_peak_mac_factor": "u*v*w",
+      "os_a_full_issue_bandwidth_factor": "u*w",
+      "os_b_full_issue_bandwidth_factor": "v*w",
+      "os_pe_partial_sum_state_factor": "u*v",
+      "os_no_spill_whole_gemm_final_d_byte_factor": "1",
+      "os_ideal_average_final_d_bandwidth_factor_when_fully_mapped": "u*v*w",
+      "ws_reduction_k_coverage_factor": "u*w",
+      "ws_a_full_issue_bandwidth_factor": "u*w",
+      "ws_pe_weight_storage_capacity_factor": "u*v*w",
+      "ws_b_preload_bandwidth_if_loading_one_PE_row_per_issue_factor": "v*w; loader-dependent, not automatically u*v*w",
+      "ws_array_partial_output_width_factor": "v",
+      "ws_k_fold_count": "F=ceil(K/(R*L)); after growth F_new=ceil(K/(u*w*R*L))",
+      "ws_accumulator_sram_reads_bytes_beta0": "(F-1)*M*N*4",
+      "ws_accumulator_sram_writes_bytes": "F*M*N*4",
+      "ws_final_d_bytes": "M*N*4 regardless of F; D aliases accumulator in these counts",
+      "ws_total_partial_emissions_factor": "F_new/F; approximate 1/(u*w) only without ceil/tail effects",
+      "ws_global_B_preload_bytes_with_full_M_reuse": "K*N*b_bits/8; constant, despite PE capacity growth",
+      "ws_R_semantics": "R extends K reduction, not M; true M parallelism needs independent/replicated WS groups",
+      "ws_underfilled_k_limit": "useful A bytes/issue=min(K_remaining,R*L)*a_bits/8; cannot scale beyond available K",
+      "ws_final_vs_partial_bandwidth": "Array-edge partial-sum width scales with v. Whole-GEMM final-D bytes are fixed, so final-D average over a shortened full-utilization window can scale by u*v*w; these are different metrics."
+    },
+    "cases": {
+      "baseline": {
+        "gemm": {
+          "m": 256,
+          "n": 256,
+          "k": 4096,
+          "beta": 0
+        },
+        "array": {
+          "rows": 16,
+          "cols": 16,
+          "dot_length": 64,
+          "issue_interval": 1,
+          "a_bits": 4,
+          "b_bits": 4,
+          "accumulator_bits": 32
+        },
+        "k_fold_span": 1024,
+        "k_fold_count": 4,
+        "k_fold_valid_lengths": [
+          1024,
+          1024,
+          1024,
+          1024
+        ],
+        "flows": {
+          "os": {
+            "dataflow": "os",
+            "loop_order": [
+              "m_tile(rows)",
+              "n_tile(cols)",
+              "k_dot_group(dot_length)"
+            ],
+            "ideal_compute_issues": 16384,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 16384,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 8388608,
+            "b_total_array_input_bytes": 8388608,
+            "a_preload_bytes": 0,
+            "b_preload_bytes": 0,
+            "a_stream_bytes": 8388608,
+            "b_stream_bytes": 8388608,
+            "a_average_stream_bytes_per_compute_issue": 512,
+            "b_average_stream_bytes_per_compute_issue": 512,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 0,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 0,
+            "array_result_emissions": 65536,
+            "array_result_emission_bytes": 262144,
+            "average_array_output_bytes_per_compute_issue": 16,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 0,
+              "write_bytes": 262144,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 0,
+              "logical_result_working_set_bytes": 1024,
+              "where": "PE-local FP32 accumulators",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [],
+            "spatial_mapping": {
+              "pe_row": "m",
+              "pe_col": "n",
+              "dot_lane": "k"
+            },
+            "stationary_operand": "FP32 partial sum for one output tile",
+            "nominal_full_issue_a_bytes": 512,
+            "nominal_full_issue_b_bytes": 512,
+            "whole_output_tile_bytes": 1024,
+            "writeback_burst_shape_is_not_scheduled": true,
+            "pe_accumulator_physical_bytes": 1024
+          },
+          "ws": {
+            "dataflow": "ws",
+            "loop_order": [
+              "n_tile(cols)",
+              "k_tile(rows*dot_length)",
+              "m_stream"
+            ],
+            "ideal_compute_issues": 16384,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 16384,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 8388608,
+            "b_total_array_input_bytes": 524288,
+            "a_preload_bytes": 0,
+            "b_preload_bytes": 524288,
+            "a_stream_bytes": 8388608,
+            "b_stream_bytes": 0,
+            "a_average_stream_bytes_per_compute_issue": 512,
+            "b_average_stream_bytes_per_compute_issue": 0,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 1024,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 64,
+            "array_result_emissions": 262144,
+            "array_result_emission_bytes": 1048576,
+            "average_array_output_bytes_per_compute_issue": 64,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 786432,
+              "write_bytes": 1048576,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 16384,
+              "logical_result_working_set_bytes": 16384,
+              "where": "external result accumulator",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [
+              16,
+              16,
+              16,
+              16
+            ],
+            "spatial_mapping": {
+              "pe_row": "k_dot_group",
+              "pe_col": "n",
+              "dot_lane": "k_within_dot_group"
+            },
+            "stationary_operand": "B weight vector in each PE",
+            "full_stream_a_bytes_per_issue_by_k_fold": [
+              512,
+              512,
+              512,
+              512
+            ],
+            "nominal_full_hardware_a_bytes_per_issue": 512,
+            "steady_array_output_upper_bound_bytes_per_issue": 64,
+            "pe_weight_storage_capacity_bytes": 8192,
+            "preload_payload_per_n_tile_bytes": [
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768
+            ],
+            "useful_pe_to_pe_partial_sum_hop_bytes": 15728640
+          },
+          "is": {
+            "dataflow": "is",
+            "loop_order": [
+              "m_tile(cols)",
+              "k_tile(rows*dot_length)",
+              "n_stream"
+            ],
+            "ideal_compute_issues": 16384,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 16384,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 524288,
+            "b_total_array_input_bytes": 8388608,
+            "a_preload_bytes": 524288,
+            "b_preload_bytes": 0,
+            "a_stream_bytes": 0,
+            "b_stream_bytes": 8388608,
+            "a_average_stream_bytes_per_compute_issue": 0,
+            "b_average_stream_bytes_per_compute_issue": 512,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 1024,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 64,
+            "array_result_emissions": 262144,
+            "array_result_emission_bytes": 1048576,
+            "average_array_output_bytes_per_compute_issue": 64,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 786432,
+              "write_bytes": 1048576,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 16384,
+              "logical_result_working_set_bytes": 16384,
+              "where": "external result accumulator",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [
+              16,
+              16,
+              16,
+              16
+            ],
+            "spatial_mapping": {
+              "pe_row": "k_dot_group",
+              "pe_col": "m",
+              "dot_lane": "k_within_dot_group"
+            },
+            "stationary_operand": "A input vector in each PE",
+            "full_stream_b_bytes_per_issue_by_k_fold": [
+              512,
+              512,
+              512,
+              512
+            ],
+            "steady_array_output_upper_bound_bytes_per_issue": 64,
+            "pe_input_storage_capacity_bytes": 8192
+          }
+        },
+        "ratios_to_baseline": {
+          "os": {
+            "physical_peak_macs_per_issue": 1,
+            "ideal_compute_issues": 1,
+            "a_total_array_input_bytes": 1,
+            "b_total_array_input_bytes": 1,
+            "array_result_emission_bytes": 1,
+            "final_d_bytes": 1,
+            "average_array_output_bytes_per_compute_issue": 1,
+            "nominal_a_stream_bandwidth": 1,
+            "nominal_b_stream_bandwidth": 1
+          },
+          "ws": {
+            "physical_peak_macs_per_issue": 1,
+            "ideal_compute_issues": 1,
+            "a_total_array_input_bytes": 1,
+            "b_total_array_input_bytes": 1,
+            "array_result_emission_bytes": 1,
+            "final_d_bytes": 1,
+            "average_array_output_bytes_per_compute_issue": 1,
+            "nominal_a_stream_bandwidth": 1,
+            "pe_weight_capacity": 1
+          }
+        }
+      },
+      "double_dot_k_length": {
+        "gemm": {
+          "m": 256,
+          "n": 256,
+          "k": 4096,
+          "beta": 0
+        },
+        "array": {
+          "rows": 16,
+          "cols": 16,
+          "dot_length": 128,
+          "issue_interval": 1,
+          "a_bits": 4,
+          "b_bits": 4,
+          "accumulator_bits": 32
+        },
+        "k_fold_span": 2048,
+        "k_fold_count": 2,
+        "k_fold_valid_lengths": [
+          2048,
+          2048
+        ],
+        "flows": {
+          "os": {
+            "dataflow": "os",
+            "loop_order": [
+              "m_tile(rows)",
+              "n_tile(cols)",
+              "k_dot_group(dot_length)"
+            ],
+            "ideal_compute_issues": 8192,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 32768,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 8388608,
+            "b_total_array_input_bytes": 8388608,
+            "a_preload_bytes": 0,
+            "b_preload_bytes": 0,
+            "a_stream_bytes": 8388608,
+            "b_stream_bytes": 8388608,
+            "a_average_stream_bytes_per_compute_issue": 1024,
+            "b_average_stream_bytes_per_compute_issue": 1024,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 0,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 0,
+            "array_result_emissions": 65536,
+            "array_result_emission_bytes": 262144,
+            "average_array_output_bytes_per_compute_issue": 32,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 0,
+              "write_bytes": 262144,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 0,
+              "logical_result_working_set_bytes": 1024,
+              "where": "PE-local FP32 accumulators",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [],
+            "spatial_mapping": {
+              "pe_row": "m",
+              "pe_col": "n",
+              "dot_lane": "k"
+            },
+            "stationary_operand": "FP32 partial sum for one output tile",
+            "nominal_full_issue_a_bytes": 1024,
+            "nominal_full_issue_b_bytes": 1024,
+            "whole_output_tile_bytes": 1024,
+            "writeback_burst_shape_is_not_scheduled": true,
+            "pe_accumulator_physical_bytes": 1024
+          },
+          "ws": {
+            "dataflow": "ws",
+            "loop_order": [
+              "n_tile(cols)",
+              "k_tile(rows*dot_length)",
+              "m_stream"
+            ],
+            "ideal_compute_issues": 8192,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 32768,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 8388608,
+            "b_total_array_input_bytes": 524288,
+            "a_preload_bytes": 0,
+            "b_preload_bytes": 524288,
+            "a_stream_bytes": 8388608,
+            "b_stream_bytes": 0,
+            "a_average_stream_bytes_per_compute_issue": 1024,
+            "b_average_stream_bytes_per_compute_issue": 0,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 1024,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 32,
+            "array_result_emissions": 131072,
+            "array_result_emission_bytes": 524288,
+            "average_array_output_bytes_per_compute_issue": 64,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 262144,
+              "write_bytes": 524288,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 16384,
+              "logical_result_working_set_bytes": 16384,
+              "where": "external result accumulator",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [
+              16,
+              16
+            ],
+            "spatial_mapping": {
+              "pe_row": "k_dot_group",
+              "pe_col": "n",
+              "dot_lane": "k_within_dot_group"
+            },
+            "stationary_operand": "B weight vector in each PE",
+            "full_stream_a_bytes_per_issue_by_k_fold": [
+              1024,
+              1024
+            ],
+            "nominal_full_hardware_a_bytes_per_issue": 1024,
+            "steady_array_output_upper_bound_bytes_per_issue": 64,
+            "pe_weight_storage_capacity_bytes": 16384,
+            "preload_payload_per_n_tile_bytes": [
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768
+            ],
+            "useful_pe_to_pe_partial_sum_hop_bytes": 7864320
+          },
+          "is": {
+            "dataflow": "is",
+            "loop_order": [
+              "m_tile(cols)",
+              "k_tile(rows*dot_length)",
+              "n_stream"
+            ],
+            "ideal_compute_issues": 8192,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 32768,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 524288,
+            "b_total_array_input_bytes": 8388608,
+            "a_preload_bytes": 524288,
+            "b_preload_bytes": 0,
+            "a_stream_bytes": 0,
+            "b_stream_bytes": 8388608,
+            "a_average_stream_bytes_per_compute_issue": 0,
+            "b_average_stream_bytes_per_compute_issue": 1024,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 1024,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 32,
+            "array_result_emissions": 131072,
+            "array_result_emission_bytes": 524288,
+            "average_array_output_bytes_per_compute_issue": 64,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 262144,
+              "write_bytes": 524288,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 16384,
+              "logical_result_working_set_bytes": 16384,
+              "where": "external result accumulator",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [
+              16,
+              16
+            ],
+            "spatial_mapping": {
+              "pe_row": "k_dot_group",
+              "pe_col": "m",
+              "dot_lane": "k_within_dot_group"
+            },
+            "stationary_operand": "A input vector in each PE",
+            "full_stream_b_bytes_per_issue_by_k_fold": [
+              1024,
+              1024
+            ],
+            "steady_array_output_upper_bound_bytes_per_issue": 64,
+            "pe_input_storage_capacity_bytes": 16384
+          }
+        },
+        "ratios_to_baseline": {
+          "os": {
+            "physical_peak_macs_per_issue": 2,
+            "ideal_compute_issues": 0.5,
+            "a_total_array_input_bytes": 1,
+            "b_total_array_input_bytes": 1,
+            "array_result_emission_bytes": 1,
+            "final_d_bytes": 1,
+            "average_array_output_bytes_per_compute_issue": 2,
+            "nominal_a_stream_bandwidth": 2,
+            "nominal_b_stream_bandwidth": 2
+          },
+          "ws": {
+            "physical_peak_macs_per_issue": 2,
+            "ideal_compute_issues": 0.5,
+            "a_total_array_input_bytes": 1,
+            "b_total_array_input_bytes": 1,
+            "array_result_emission_bytes": 0.5,
+            "final_d_bytes": 1,
+            "average_array_output_bytes_per_compute_issue": 1,
+            "nominal_a_stream_bandwidth": 2,
+            "pe_weight_capacity": 2
+          }
+        }
+      },
+      "double_pe_rows": {
+        "gemm": {
+          "m": 256,
+          "n": 256,
+          "k": 4096,
+          "beta": 0
+        },
+        "array": {
+          "rows": 32,
+          "cols": 16,
+          "dot_length": 64,
+          "issue_interval": 1,
+          "a_bits": 4,
+          "b_bits": 4,
+          "accumulator_bits": 32
+        },
+        "k_fold_span": 2048,
+        "k_fold_count": 2,
+        "k_fold_valid_lengths": [
+          2048,
+          2048
+        ],
+        "flows": {
+          "os": {
+            "dataflow": "os",
+            "loop_order": [
+              "m_tile(rows)",
+              "n_tile(cols)",
+              "k_dot_group(dot_length)"
+            ],
+            "ideal_compute_issues": 8192,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 32768,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 8388608,
+            "b_total_array_input_bytes": 4194304,
+            "a_preload_bytes": 0,
+            "b_preload_bytes": 0,
+            "a_stream_bytes": 8388608,
+            "b_stream_bytes": 4194304,
+            "a_average_stream_bytes_per_compute_issue": 1024,
+            "b_average_stream_bytes_per_compute_issue": 512,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 0,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 0,
+            "array_result_emissions": 65536,
+            "array_result_emission_bytes": 262144,
+            "average_array_output_bytes_per_compute_issue": 32,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 0,
+              "write_bytes": 262144,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 0,
+              "logical_result_working_set_bytes": 2048,
+              "where": "PE-local FP32 accumulators",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [],
+            "spatial_mapping": {
+              "pe_row": "m",
+              "pe_col": "n",
+              "dot_lane": "k"
+            },
+            "stationary_operand": "FP32 partial sum for one output tile",
+            "nominal_full_issue_a_bytes": 1024,
+            "nominal_full_issue_b_bytes": 512,
+            "whole_output_tile_bytes": 2048,
+            "writeback_burst_shape_is_not_scheduled": true,
+            "pe_accumulator_physical_bytes": 2048
+          },
+          "ws": {
+            "dataflow": "ws",
+            "loop_order": [
+              "n_tile(cols)",
+              "k_tile(rows*dot_length)",
+              "m_stream"
+            ],
+            "ideal_compute_issues": 8192,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 32768,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 8388608,
+            "b_total_array_input_bytes": 524288,
+            "a_preload_bytes": 0,
+            "b_preload_bytes": 524288,
+            "a_stream_bytes": 8388608,
+            "b_stream_bytes": 0,
+            "a_average_stream_bytes_per_compute_issue": 1024,
+            "b_average_stream_bytes_per_compute_issue": 0,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 1024,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 32,
+            "array_result_emissions": 131072,
+            "array_result_emission_bytes": 524288,
+            "average_array_output_bytes_per_compute_issue": 64,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 262144,
+              "write_bytes": 524288,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 16384,
+              "logical_result_working_set_bytes": 16384,
+              "where": "external result accumulator",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [
+              32,
+              32
+            ],
+            "spatial_mapping": {
+              "pe_row": "k_dot_group",
+              "pe_col": "n",
+              "dot_lane": "k_within_dot_group"
+            },
+            "stationary_operand": "B weight vector in each PE",
+            "full_stream_a_bytes_per_issue_by_k_fold": [
+              1024,
+              1024
+            ],
+            "nominal_full_hardware_a_bytes_per_issue": 1024,
+            "steady_array_output_upper_bound_bytes_per_issue": 64,
+            "pe_weight_storage_capacity_bytes": 16384,
+            "preload_payload_per_n_tile_bytes": [
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768,
+              32768
+            ],
+            "useful_pe_to_pe_partial_sum_hop_bytes": 16252928
+          },
+          "is": {
+            "dataflow": "is",
+            "loop_order": [
+              "m_tile(cols)",
+              "k_tile(rows*dot_length)",
+              "n_stream"
+            ],
+            "ideal_compute_issues": 8192,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 32768,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 524288,
+            "b_total_array_input_bytes": 8388608,
+            "a_preload_bytes": 524288,
+            "b_preload_bytes": 0,
+            "a_stream_bytes": 0,
+            "b_stream_bytes": 8388608,
+            "a_average_stream_bytes_per_compute_issue": 0,
+            "b_average_stream_bytes_per_compute_issue": 1024,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 1024,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 32,
+            "array_result_emissions": 131072,
+            "array_result_emission_bytes": 524288,
+            "average_array_output_bytes_per_compute_issue": 64,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 262144,
+              "write_bytes": 524288,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 16384,
+              "logical_result_working_set_bytes": 16384,
+              "where": "external result accumulator",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [
+              32,
+              32
+            ],
+            "spatial_mapping": {
+              "pe_row": "k_dot_group",
+              "pe_col": "m",
+              "dot_lane": "k_within_dot_group"
+            },
+            "stationary_operand": "A input vector in each PE",
+            "full_stream_b_bytes_per_issue_by_k_fold": [
+              1024,
+              1024
+            ],
+            "steady_array_output_upper_bound_bytes_per_issue": 64,
+            "pe_input_storage_capacity_bytes": 16384
+          }
+        },
+        "ratios_to_baseline": {
+          "os": {
+            "physical_peak_macs_per_issue": 2,
+            "ideal_compute_issues": 0.5,
+            "a_total_array_input_bytes": 1,
+            "b_total_array_input_bytes": 0.5,
+            "array_result_emission_bytes": 1,
+            "final_d_bytes": 1,
+            "average_array_output_bytes_per_compute_issue": 2,
+            "nominal_a_stream_bandwidth": 2,
+            "nominal_b_stream_bandwidth": 1
+          },
+          "ws": {
+            "physical_peak_macs_per_issue": 2,
+            "ideal_compute_issues": 0.5,
+            "a_total_array_input_bytes": 1,
+            "b_total_array_input_bytes": 1,
+            "array_result_emission_bytes": 0.5,
+            "final_d_bytes": 1,
+            "average_array_output_bytes_per_compute_issue": 1,
+            "nominal_a_stream_bandwidth": 2,
+            "pe_weight_capacity": 2
+          }
+        }
+      },
+      "double_pe_columns": {
+        "gemm": {
+          "m": 256,
+          "n": 256,
+          "k": 4096,
+          "beta": 0
+        },
+        "array": {
+          "rows": 16,
+          "cols": 32,
+          "dot_length": 64,
+          "issue_interval": 1,
+          "a_bits": 4,
+          "b_bits": 4,
+          "accumulator_bits": 32
+        },
+        "k_fold_span": 1024,
+        "k_fold_count": 4,
+        "k_fold_valid_lengths": [
+          1024,
+          1024,
+          1024,
+          1024
+        ],
+        "flows": {
+          "os": {
+            "dataflow": "os",
+            "loop_order": [
+              "m_tile(rows)",
+              "n_tile(cols)",
+              "k_dot_group(dot_length)"
+            ],
+            "ideal_compute_issues": 8192,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 32768,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 4194304,
+            "b_total_array_input_bytes": 8388608,
+            "a_preload_bytes": 0,
+            "b_preload_bytes": 0,
+            "a_stream_bytes": 4194304,
+            "b_stream_bytes": 8388608,
+            "a_average_stream_bytes_per_compute_issue": 512,
+            "b_average_stream_bytes_per_compute_issue": 1024,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 0,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 0,
+            "array_result_emissions": 65536,
+            "array_result_emission_bytes": 262144,
+            "average_array_output_bytes_per_compute_issue": 32,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 0,
+              "write_bytes": 262144,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 0,
+              "logical_result_working_set_bytes": 2048,
+              "where": "PE-local FP32 accumulators",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [],
+            "spatial_mapping": {
+              "pe_row": "m",
+              "pe_col": "n",
+              "dot_lane": "k"
+            },
+            "stationary_operand": "FP32 partial sum for one output tile",
+            "nominal_full_issue_a_bytes": 512,
+            "nominal_full_issue_b_bytes": 1024,
+            "whole_output_tile_bytes": 2048,
+            "writeback_burst_shape_is_not_scheduled": true,
+            "pe_accumulator_physical_bytes": 2048
+          },
+          "ws": {
+            "dataflow": "ws",
+            "loop_order": [
+              "n_tile(cols)",
+              "k_tile(rows*dot_length)",
+              "m_stream"
+            ],
+            "ideal_compute_issues": 8192,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 32768,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 4194304,
+            "b_total_array_input_bytes": 524288,
+            "a_preload_bytes": 0,
+            "b_preload_bytes": 524288,
+            "a_stream_bytes": 4194304,
+            "b_stream_bytes": 0,
+            "a_average_stream_bytes_per_compute_issue": 512,
+            "b_average_stream_bytes_per_compute_issue": 0,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 1024,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 32,
+            "array_result_emissions": 262144,
+            "array_result_emission_bytes": 1048576,
+            "average_array_output_bytes_per_compute_issue": 128,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 786432,
+              "write_bytes": 1048576,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 32768,
+              "logical_result_working_set_bytes": 32768,
+              "where": "external result accumulator",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [
+              16,
+              16,
+              16,
+              16
+            ],
+            "spatial_mapping": {
+              "pe_row": "k_dot_group",
+              "pe_col": "n",
+              "dot_lane": "k_within_dot_group"
+            },
+            "stationary_operand": "B weight vector in each PE",
+            "full_stream_a_bytes_per_issue_by_k_fold": [
+              512,
+              512,
+              512,
+              512
+            ],
+            "nominal_full_hardware_a_bytes_per_issue": 512,
+            "steady_array_output_upper_bound_bytes_per_issue": 128,
+            "pe_weight_storage_capacity_bytes": 16384,
+            "preload_payload_per_n_tile_bytes": [
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536
+            ],
+            "useful_pe_to_pe_partial_sum_hop_bytes": 15728640
+          },
+          "is": {
+            "dataflow": "is",
+            "loop_order": [
+              "m_tile(cols)",
+              "k_tile(rows*dot_length)",
+              "n_stream"
+            ],
+            "ideal_compute_issues": 8192,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 32768,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 524288,
+            "b_total_array_input_bytes": 4194304,
+            "a_preload_bytes": 524288,
+            "b_preload_bytes": 0,
+            "a_stream_bytes": 0,
+            "b_stream_bytes": 4194304,
+            "a_average_stream_bytes_per_compute_issue": 0,
+            "b_average_stream_bytes_per_compute_issue": 512,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 1024,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 32,
+            "array_result_emissions": 262144,
+            "array_result_emission_bytes": 1048576,
+            "average_array_output_bytes_per_compute_issue": 128,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 786432,
+              "write_bytes": 1048576,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 32768,
+              "logical_result_working_set_bytes": 32768,
+              "where": "external result accumulator",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [
+              16,
+              16,
+              16,
+              16
+            ],
+            "spatial_mapping": {
+              "pe_row": "k_dot_group",
+              "pe_col": "m",
+              "dot_lane": "k_within_dot_group"
+            },
+            "stationary_operand": "A input vector in each PE",
+            "full_stream_b_bytes_per_issue_by_k_fold": [
+              512,
+              512,
+              512,
+              512
+            ],
+            "steady_array_output_upper_bound_bytes_per_issue": 128,
+            "pe_input_storage_capacity_bytes": 16384
+          }
+        },
+        "ratios_to_baseline": {
+          "os": {
+            "physical_peak_macs_per_issue": 2,
+            "ideal_compute_issues": 0.5,
+            "a_total_array_input_bytes": 0.5,
+            "b_total_array_input_bytes": 1,
+            "array_result_emission_bytes": 1,
+            "final_d_bytes": 1,
+            "average_array_output_bytes_per_compute_issue": 2,
+            "nominal_a_stream_bandwidth": 1,
+            "nominal_b_stream_bandwidth": 2
+          },
+          "ws": {
+            "physical_peak_macs_per_issue": 2,
+            "ideal_compute_issues": 0.5,
+            "a_total_array_input_bytes": 0.5,
+            "b_total_array_input_bytes": 1,
+            "array_result_emission_bytes": 1,
+            "final_d_bytes": 1,
+            "average_array_output_bytes_per_compute_issue": 2,
+            "nominal_a_stream_bandwidth": 1,
+            "pe_weight_capacity": 2
+          }
+        }
+      },
+      "double_all_three": {
+        "gemm": {
+          "m": 256,
+          "n": 256,
+          "k": 4096,
+          "beta": 0
+        },
+        "array": {
+          "rows": 32,
+          "cols": 32,
+          "dot_length": 128,
+          "issue_interval": 1,
+          "a_bits": 4,
+          "b_bits": 4,
+          "accumulator_bits": 32
+        },
+        "k_fold_span": 4096,
+        "k_fold_count": 1,
+        "k_fold_valid_lengths": [
+          4096
+        ],
+        "flows": {
+          "os": {
+            "dataflow": "os",
+            "loop_order": [
+              "m_tile(rows)",
+              "n_tile(cols)",
+              "k_dot_group(dot_length)"
+            ],
+            "ideal_compute_issues": 2048,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 131072,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 4194304,
+            "b_total_array_input_bytes": 4194304,
+            "a_preload_bytes": 0,
+            "b_preload_bytes": 0,
+            "a_stream_bytes": 4194304,
+            "b_stream_bytes": 4194304,
+            "a_average_stream_bytes_per_compute_issue": 2048,
+            "b_average_stream_bytes_per_compute_issue": 2048,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 0,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 0,
+            "array_result_emissions": 65536,
+            "array_result_emission_bytes": 262144,
+            "average_array_output_bytes_per_compute_issue": 128,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 0,
+              "write_bytes": 262144,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 0,
+              "logical_result_working_set_bytes": 4096,
+              "where": "PE-local FP32 accumulators",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [],
+            "spatial_mapping": {
+              "pe_row": "m",
+              "pe_col": "n",
+              "dot_lane": "k"
+            },
+            "stationary_operand": "FP32 partial sum for one output tile",
+            "nominal_full_issue_a_bytes": 2048,
+            "nominal_full_issue_b_bytes": 2048,
+            "whole_output_tile_bytes": 4096,
+            "writeback_burst_shape_is_not_scheduled": true,
+            "pe_accumulator_physical_bytes": 4096
+          },
+          "ws": {
+            "dataflow": "ws",
+            "loop_order": [
+              "n_tile(cols)",
+              "k_tile(rows*dot_length)",
+              "m_stream"
+            ],
+            "ideal_compute_issues": 2048,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 131072,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 4194304,
+            "b_total_array_input_bytes": 524288,
+            "a_preload_bytes": 0,
+            "b_preload_bytes": 524288,
+            "a_stream_bytes": 4194304,
+            "b_stream_bytes": 0,
+            "a_average_stream_bytes_per_compute_issue": 2048,
+            "b_average_stream_bytes_per_compute_issue": 0,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 1024,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 8,
+            "array_result_emissions": 65536,
+            "array_result_emission_bytes": 262144,
+            "average_array_output_bytes_per_compute_issue": 128,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 0,
+              "write_bytes": 262144,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 0,
+              "logical_result_working_set_bytes": 32768,
+              "where": "external result accumulator",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [
+              32
+            ],
+            "spatial_mapping": {
+              "pe_row": "k_dot_group",
+              "pe_col": "n",
+              "dot_lane": "k_within_dot_group"
+            },
+            "stationary_operand": "B weight vector in each PE",
+            "full_stream_a_bytes_per_issue_by_k_fold": [
+              2048
+            ],
+            "nominal_full_hardware_a_bytes_per_issue": 2048,
+            "steady_array_output_upper_bound_bytes_per_issue": 128,
+            "pe_weight_storage_capacity_bytes": 65536,
+            "preload_payload_per_n_tile_bytes": [
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536
+            ],
+            "useful_pe_to_pe_partial_sum_hop_bytes": 8126464
+          },
+          "is": {
+            "dataflow": "is",
+            "loop_order": [
+              "m_tile(cols)",
+              "k_tile(rows*dot_length)",
+              "n_stream"
+            ],
+            "ideal_compute_issues": 2048,
+            "useful_macs": 268435456,
+            "physical_peak_macs_per_issue": 131072,
+            "mapping_utilization": 1,
+            "a_total_array_input_bytes": 524288,
+            "b_total_array_input_bytes": 4194304,
+            "a_preload_bytes": 524288,
+            "b_preload_bytes": 0,
+            "a_stream_bytes": 0,
+            "b_stream_bytes": 4194304,
+            "a_average_stream_bytes_per_compute_issue": 0,
+            "b_average_stream_bytes_per_compute_issue": 2048,
+            "preload_interface_bytes_per_cycle_assumed": 512,
+            "preload_transfer_cycles_lower_bound": 1024,
+            "preload_is_excluded_from_compute_issues": true,
+            "preload_phase_count": 8,
+            "array_result_emissions": 65536,
+            "array_result_emission_bytes": 262144,
+            "average_array_output_bytes_per_compute_issue": 128,
+            "final_d_elements": 65536,
+            "final_d_bytes": 262144,
+            "initial_c_read_bytes": 0,
+            "sram_accumulator_if_every_emission_is_materialized": {
+              "read_bytes": 0,
+              "write_bytes": 262144,
+              "final_d_aliases_accumulator": true,
+              "extra_final_d_copy_bytes": 0
+            },
+            "resident_accumulator_policy": {
+              "sram_initial_c_read_bytes": 0,
+              "sram_final_d_write_bytes": 262144,
+              "cross_k_state_working_set_bytes": 0,
+              "logical_result_working_set_bytes": 32768,
+              "where": "external result accumulator",
+              "state_and_update_cost_is_additional_to_operand_sram": true
+            },
+            "active_reduction_rows_by_k_fold": [
+              32
+            ],
+            "spatial_mapping": {
+              "pe_row": "k_dot_group",
+              "pe_col": "m",
+              "dot_lane": "k_within_dot_group"
+            },
+            "stationary_operand": "A input vector in each PE",
+            "full_stream_b_bytes_per_issue_by_k_fold": [
+              2048
+            ],
+            "steady_array_output_upper_bound_bytes_per_issue": 128,
+            "pe_input_storage_capacity_bytes": 65536
+          }
+        },
+        "ratios_to_baseline": {
+          "os": {
+            "physical_peak_macs_per_issue": 8,
+            "ideal_compute_issues": 0.125,
+            "a_total_array_input_bytes": 0.5,
+            "b_total_array_input_bytes": 0.5,
+            "array_result_emission_bytes": 1,
+            "final_d_bytes": 1,
+            "average_array_output_bytes_per_compute_issue": 8,
+            "nominal_a_stream_bandwidth": 4,
+            "nominal_b_stream_bandwidth": 4
+          },
+          "ws": {
+            "physical_peak_macs_per_issue": 8,
+            "ideal_compute_issues": 0.125,
+            "a_total_array_input_bytes": 0.5,
+            "b_total_array_input_bytes": 1,
+            "array_result_emission_bytes": 0.25,
+            "final_d_bytes": 1,
+            "average_array_output_bytes_per_compute_issue": 2,
+            "nominal_a_stream_bandwidth": 4,
+            "pe_weight_capacity": 8
+          }
+        }
+      }
+    },
+    "true_ws_m_parallelism_two_groups": {
+      "replicas": 2,
+      "mapping": "Two independent 16x16 WS groups, each assigned 128 distinct M rows",
+      "dtype": "fp4",
+      "dot_length": 64,
+      "ideal_concurrent_compute_issues": 8192,
+      "aggregate_peak_macs_per_issue": 32768,
+      "aggregate_a_stream_bytes_per_issue": 1024,
+      "aggregate_array_partial_output_bytes_per_issue": 128,
+      "a_total_array_input_bytes": 8388608,
+      "b_delivered_to_all_pe_copies_bytes": 1048576,
+      "b_sram_read_bytes_with_perfect_multicast": 524288,
+      "b_sram_read_bytes_without_multicast": 1048576,
+      "k_folds_per_replica": 4,
+      "array_result_emission_bytes": 1048576,
+      "final_d_bytes": 262144,
+      "sram_accumulator_rmw_read_bytes": 786432,
+      "sram_accumulator_rmw_write_bytes": 1048576,
+      "cross_k_retained_acc_state_aggregate_bytes": 16384,
+      "hardware_requirements": [
+        "Independent reduction-chain starts/ends and result ports for every WS group",
+        "Independent activation input streams, plus per-group routing and control",
+        "Replicated PE weight storage even if SRAM reads use multicast",
+        "Enough simultaneous SRAM/ACC port bandwidth; multicast network cost is not zero"
+      ]
+    }
+  },
+  "mac_coverage_checks": [
+    {
+      "m": 7,
+      "n": 11,
+      "k": 13,
+      "rows": 4,
+      "cols": 3,
+      "dot_length": 2,
+      "checks": [
+        {
+          "dataflow": "os",
+          "exact_integer_gemm": true,
+          "every_mac_covered_exactly_once": true,
+          "macs_checked": 1001
+        },
+        {
+          "dataflow": "ws",
+          "exact_integer_gemm": true,
+          "every_mac_covered_exactly_once": true,
+          "macs_checked": 1001
+        },
+        {
+          "dataflow": "is",
+          "exact_integer_gemm": true,
+          "every_mac_covered_exactly_once": true,
+          "macs_checked": 1001
+        }
+      ]
+    },
+    {
+      "m": 7,
+      "n": 11,
+      "k": 13,
+      "rows": 4,
+      "cols": 3,
+      "dot_length": 5,
+      "checks": [
+        {
+          "dataflow": "os",
+          "exact_integer_gemm": true,
+          "every_mac_covered_exactly_once": true,
+          "macs_checked": 1001
+        },
+        {
+          "dataflow": "ws",
+          "exact_integer_gemm": true,
+          "every_mac_covered_exactly_once": true,
+          "macs_checked": 1001
+        },
+        {
+          "dataflow": "is",
+          "exact_integer_gemm": true,
+          "every_mac_covered_exactly_once": true,
+          "macs_checked": 1001
+        }
+      ]
+    }
+  ],
+  "loop_order_capacity_tradeoff": {
+    "ws_full_m_residency_bytes": "M * min(C,N) * 4 when retaining partial sums across K folds",
+    "ws_register_acc_block_m": "floor(accumulator_capacity_bytes / (min(C,N)*4))",
+    "ws_blocked_loop_order": [
+      "n_tile",
+      "m_block",
+      "k_tile",
+      "m_in_block"
+    ],
+    "ws_b_preload_with_blocked_m_bytes": "ceil(M/m_block) * K * N * b_bits / 8",
+    "example_m256_n256_k4096": {
+      "full_m_acc_state_per_n_tile_bytes": 16384,
+      "if_acc_state_only_1024_bytes_m_block": 16,
+      "weight_preload_multiplier_for_m_block16": 16,
+      "consequence": "Weight reuse advantage over OS disappears for this schedule; A traffic remains unchanged"
+    },
+    "alternative": "Keep n_tile,k_tile,m and spill partial sums to external SRAM; count its RMW traffic instead of reloading B"
+  },
+  "trace_schema_recommendations": [
+    "Separate logical tensors A,B,C_initial,partial_sum,D from physical buffers and alias groups",
+    "Record spatial axis mapping, temporal loop order, tile sizes, partitions, phase and precision",
+    "Each transfer records source/destination storage levels and instances; PE forwarding is not SRAM traffic",
+    "Record logical indices/ranges, valid masks, useful bits, packed bits, address/bank/lane and transaction width",
+    "Represent preload, streaming, initial seed, reduction forwarding, spill/reload and final drain as separate phases",
+    "Track partial-sum version, accumulation dependency and final-result marker, including beta initialization",
+    "Represent accumulator location/capacity/ports/latency and D aliasing explicitly",
+    "Attach issue and completion times plus stalls only when a scheduler actually computes them",
+    "Validate MAC coverage, exactly one final D per m,n, value dependencies, storage lifetimes and per-port constraints"
+  ],
+  "primary_sources": [
+    {
+      "url": "https://arxiv.org/html/2610.19645v1",
+      "section": "II-A",
+      "role": "Example of WS dot-product PEs, fixed FP32 inter-PE partial sums and external result accumulation; not a specification of this custom H16Q32E64 array"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/scalesim-project/SCALE-Sim/main/scalesim/compute/systolic_compute_ws.py",
+      "role": "Primary code showing WS row/reduction and column/output mapping plus output emissions per K fold"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/scalesim-project/SCALE-Sim/main/scalesim/compute/systolic_compute_is.py",
+      "role": "Primary code showing IS reduction rows and transposed free-axis mapping"
+    }
+  ]
+}

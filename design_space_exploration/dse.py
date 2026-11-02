@@ -50,6 +50,7 @@ def template_to_system(arch_specs):
         systolic_array_specs["mac_per_cycle"],
         int(re.search(r"(\d+)", systolic_array_specs["data_type"]).group(1)) // 8,
         int(re.search(r"(\d+)", systolic_array_specs["data_type"]).group(1)) // 8,
+        precision_profile=systolic_array_specs.get("precision_profile"),
     )
     # core
     core = Core(

@@ -1,0 +1,9 @@
+# CPU-only baseline for simulation; this does not enable run_on_gpu().
+# Install using the official PyTorch CPU index in addition to PyPI.
+torch==2.0.0+cpu
+numpy==1.24.4
+pandas==1.5.3
+scipy==1.10.1
+matplotlib==3.7.5
+seaborn==0.13.2
+scalesim==2.0.2

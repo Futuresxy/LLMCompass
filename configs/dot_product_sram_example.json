@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "description": "Illustrative dot-product PE and independent SRAM slice design space; not a reconstruction of any commercial chip.",
+  "shapes": [[16, 16], [32, 8]],
+  "k": 256,
+  "issue_interval_cycles": 1,
+  "accumulator_bits": 32,
+  "initial_c": false,
+  "accumulator_policies": ["resident", "l0c_rmw"],
+  "gating_policies": ["slice", "full_group"],
+  "profiles": {
+    "1:2:4": {"bf16": 16, "fp8": 32, "fp4": 64},
+    "1:2:6": {"bf16": 16, "fp8": 32, "fp4": 96},
+    "1:2:8": {"bf16": 16, "fp8": 32, "fp4": 128},
+    "1:4:8": {"bf16": 16, "fp8": 64, "fp4": 128}
+  },
+  "precision_bits": {"bf16": 16, "fp8": 8, "fp4": 4},
+  "baseline_profile": "1:2:4",
+  "slice_bits": 128,
+  "candidate_slices_per_group": [1, 2, 4, 8],
+  "installed_input_slices_per_group": 2,
+  "buffers": {
+    "A": {"name": "L0A_like", "capacity_bytes": 131072, "capacity_basis": "total", "slots": 2, "layout": "separate_slots", "frequency_hz": 1000000000, "technology_nm": 22},
+    "B": {"name": "L0B_like", "capacity_bytes": 131072, "capacity_basis": "total", "slots": 2, "layout": "separate_slots", "frequency_hz": 1000000000, "technology_nm": 22},
+    "C": {"name": "L0C_like", "capacity_bytes": 65536, "capacity_basis": "total", "slots": 1, "layout": "shared_macro", "frequency_hz": 1000000000, "technology_nm": 22}
+  },
+  "ports": {
+    "A": {"rw_ports": 1},
+    "B": {"rw_ports": 1},
+    "C": {"rw_ports": 0, "read_ports": 1, "write_ports": 1}
+  }
+}

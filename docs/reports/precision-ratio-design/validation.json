@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "source_sha256_matches": true,
+  "study_rows": 112,
+  "study_path": "artifacts/precision-ratios/uniform-verified/result.json",
+  "legacy_baseline_stages": 9,
+  "legacy_source_cache_unchanged": true,
+  "unit_test_command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests -v",
+  "unit_tests_passed": 89,
+  "scope": "Software regression and reference compute validation, not silicon validation",
+  "report_sha256": "0bc5905e9bb0aa47890cbee9b15ae0c41615a3263904fe33fe873f0f27a452a5"
+}

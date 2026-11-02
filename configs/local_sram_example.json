@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "description": "Illustrative 22nm operand SRAM, not an Ascend product specification. Each operand has 32KiB total physical capacity, split into two independent ping-pong slots.",
+  "assumptions": "Same clock, reuse and physical format within each precision mode. Baseline demands are physical byte rates. Parallel banks have independent interfaces and conflict-free striping. Unspecified external wiring/control costs are excluded.",
+  "baseline_throughput_mac_per_cycle": {"bf16": 256, "fp8": 512, "fp4": 1024},
+  "target_throughput_mac_per_cycle": {"bf16": 256, "fp8": 512, "fp4": 2048},
+  "buffers": [
+    {"name": "L0A_like", "capacity_bytes": 32768, "capacity_basis": "total", "slots": 2, "layout": "separate_slots", "frequency_hz": 1000000000, "technology_nm": 22, "temperature_k": 300, "live_tile_bytes": 16384},
+    {"name": "L0B_like", "capacity_bytes": 32768, "capacity_basis": "total", "slots": 2, "layout": "separate_slots", "frequency_hz": 1000000000, "technology_nm": 22, "temperature_k": 300, "live_tile_bytes": 16384}
+  ],
+  "installed": {
+    "L0A_like": {"banks": 2, "width_bits": 256, "rw_ports": 1},
+    "L0B_like": {"banks": 2, "width_bits": 256, "rw_ports": 1}
+  },
+  "baseline_demands": {
+    "bf16": {"L0A_like": {"read_bytes_per_cycle": 64, "write_bytes_per_cycle": 16}, "L0B_like": {"read_bytes_per_cycle": 64, "write_bytes_per_cycle": 16}},
+    "fp8": {"L0A_like": {"read_bytes_per_cycle": 64, "write_bytes_per_cycle": 16}, "L0B_like": {"read_bytes_per_cycle": 64, "write_bytes_per_cycle": 16}},
+    "fp4": {"L0A_like": {"read_bytes_per_cycle": 64, "write_bytes_per_cycle": 16}, "L0B_like": {"read_bytes_per_cycle": 64, "write_bytes_per_cycle": 16}}
+  },
+  "search": {
+    "banks": [1, 2, 4, 8],
+    "width_bits": [64, 128, 256, 512],
+    "ports": [{"rw_ports": 1}, {"rw_ports": 0, "read_ports": 1, "write_ports": 1}]
+  },
+  "sweep_mode": "fp4",
+  "sweep_multipliers": [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4],
+  "baseline_headroom_factor": 1.0
+}

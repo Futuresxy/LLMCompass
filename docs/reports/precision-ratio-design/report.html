@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LLMCompass：多精度 Tensor Core 配比建模与实验设计</title>
+<style>
+:root{--ink:#182c40;--muted:#53687a;--line:#d6e1e9;--blue:#175e98;--green:#067b73;--bg:#f3f7fa}
+*{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--bg);font:16px/1.85 system-ui,"Noto Sans CJK SC",sans-serif}main{max-width:1120px;margin:auto;padding:40px 30px 80px}header{background:#14334d;color:white;padding:36px;border-radius:16px}h1{font-size:30px;line-height:1.4;margin:12px 0}h2{font-size:23px;margin:42px 0 12px;border-bottom:2px solid var(--line);padding-bottom:10px}h3{font-size:18px;margin:25px 0 8px}p{margin:12px 0}a{color:var(--blue);overflow-wrap:anywhere}header a{color:#b8e5ff}.tag{font-size:13px;letter-spacing:.08em;color:#b9e0f8}.note{background:#e8f4f1;border-left:4px solid var(--green);padding:15px 20px;margin:20px 0}.boundary{background:#fff4dd;border-left:4px solid #ae7e1b;padding:15px 20px;margin:20px 0}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:20px 0}.card,section.panel{background:white;border:1px solid var(--line);border-radius:12px;padding:20px}.card b{display:block;font-size:21px;color:var(--blue)}.small{font-size:13px;color:var(--muted)}.table{overflow-x:auto;margin:18px 0}table{border-collapse:collapse;width:100%;background:white;font-size:14px}td,th{border:1px solid var(--line);padding:10px 12px;text-align:left;vertical-align:top}th{background:#e8f0f6}code{font-family:ui-monospace,monospace;font-size:.9em;overflow-wrap:anywhere}pre{background:#172f44;color:#e6f3ff;padding:20px;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.7}.figure{background:white;padding:15px;border:1px solid var(--line);border-radius:12px}svg{display:block;width:100%;height:auto}.legend span{display:inline-block;margin-right:20px}.dot{width:12px;height:12px;display:inline-block;margin-right:6px}.controls{display:flex;gap:16px;flex-wrap:wrap;margin:18px 0}select{max-width:100%;padding:9px;background:white;border:1px solid #9db3c5;border-radius:6px;font:inherit}.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.flow div{background:#e9f2f7;padding:14px;border:1px solid var(--line);border-radius:8px;font-size:14px}.flow strong{display:block;color:var(--blue)}li{margin:8px 0}.metric{font-size:24px;color:var(--blue)}footer{margin-top:50px;border-top:1px solid var(--line);padding-top:15px;color:var(--muted)}@media(max-width:650px){main{padding:18px 14px 45px}header{padding:22px}h1{font-size:25px}.grid,.flow{grid-template-columns:1fr}.table{font-size:12px}td,th{padding:7px}h2{font-size:20px}}@media print{body{background:white;font-size:11px}main{max-width:none;padding:0}header{padding:20px}h1{font-size:23px}h2{font-size:18px;margin-top:25px}h3{font-size:14px}table{font-size:10px}.card,.note,.boundary,pre,.figure{break-inside:avoid}a{color:inherit}.controls{display:none}section{break-inside:auto}}
+</style>
+</head>
+<body><main>
+<header>
+<div class="tag">LLMCOMPASS · REFERENCE DESIGN · 2026-10-29</div>
+<h1>面向多精度部署组合的 Tensor Core 算力配比探索</h1>
+<p>在固定 M/N 网格上，通过扩展点积单元的 K 并行度，比较 1:2:4、1:2:6、1:2:8、1:4:8。先完成可复现的计算建模，再用真实 PPA、供数约束和跨模型验证决定芯片配比。</p>
+<p><code>feature/precision-ratio-kexpansion</code> · FP16/BF16 · MXFP8/6 · MXFP4/NVFP4/HiF4</p>
+</header>
+
+<div class="grid">
+<div class="card"><b>已实现</b>格式描述、分组存储字节数、三档配比、真实 SCALE-Sim OS token 调度、GEMM 接入、统一精度实验入口。</div>
+<div class="card"><b>等待数据</b>候选 Tensor Core 的面积、各格式功耗、可实现频率；目标模型的算子轨迹、非 GEMM 时间与精度验证。</div>
+<div class="card"><b>仍需扩展</b>局部 SRAM 时序与阻塞、格式转换、真实芯片校准、固定芯片面积/功耗评估。</div>
+</div>
+
+<div class="note"><strong>研究问题：</strong>在规定的芯片预算与质量要求下，哪种多精度算力配比能在一个预先定义的模型部署组合上，获得更好的吞吐、延迟或能效，同时控制未参与设计的模型与高精度负载的退化？</div>
+
+<h2>1. 故事应当围绕部署组合与硬件预算展开</h2>
+<p>算力配比是硬件资源分配问题。传统位宽递减所对应的峰值增长规律，不自动等于现代推理部署的最佳资源分配。提出更高的低精度算力后，需要证明新增面积和功耗在多种负载上值得投入。</p>
+<p>只保持核数与频率不变，再观察 FP4 GEMM 变快，会得到较容易预期的结果。能够支持芯片决策的结论应进一步比较：同样的额外面积，用于低精度 K 扩展、增加常规计算引擎、增加操作数带宽，哪一种在目标部署组合中更有价值。</p>
+<p>通用性来自通用 GEMM 接口、保留高精度功能、一个冻结的硬件选择，以及跨模型家族和运行条件的验证。无需要求模型内部混合使用三种精度；单个模型的 GEMM 可以统一使用一种格式，整个部署组合仍可能同时包含 BF16、MXFP8 与 FP4 模型。</p>
+<div class="boundary"><strong>需要接受的边界：</strong>增加 FP4 算力无法直接加速统一 BF16 GEMM；保持核数时它可能没有性能变化，固定芯片面积时还可能因核数减少而变慢。应当量化这种代价，不能用“所有模型都会受益”作为研究前提。</div>
+
+<h2>2. 统一 GEMM 精度与混合精度的区别</h2>
+<p>本轮的“统一精度”指一份负载中的 GEMM 都使用同一种 A/B 格式，累加使用 FP32。Softmax、归一化、路由、通信等可以保持它们需要的格式与测量时间。输入实验入口的非 GEMM 时间固定，不随低精度峰值自动缩短。</p>
+<div class="table"><table>
+<thead><tr><th>比较</th><th>固定项</th><th>改变项</th><th>能归因于什么</th></tr></thead>
+<tbody>
+<tr><td>配比实验</td><td>模型、格式、精度校验、batch、上下文、核数与频率</td><td>1:2:4 → 1:2:8 等</td><td>计算资源分配及其实现代价</td></tr>
+<tr><td>格式实验</td><td>模型、质量门槛、硬件</td><td>BF16 → MXFP8 / NVFP4 等</td><td>量化、存储和计算格式的共同影响</td></tr>
+<tr><td>预算实验</td><td>总芯片面积或功耗、HBM/IO 条件、质量门槛</td><td>配比、核数、必要的存储组织</td><td>芯片设计选择的实际价值</td></tr>
+</tbody></table></div>
+<p>同一配比实验中，不能把基准 FP4 与新设计 FP4 的权重存储量再缩小一次。两者已有相同数据格式，新增压缩收益为零。W4A16 解量化到 FP16 的路径也不能直接记为原生 FP4 GEMM。</p>
+
+<h2>3. 格式与三档计算能力的表示</h2>
+<div class="table"><table>
+<thead><tr><th>格式</th><th>payload</th><th>本参考设计的计算档位</th><th>默认存储描述</th></tr></thead>
+<tbody>
+<tr><td>FP16 / BF16</td><td>16 bit</td><td>16 bit</td><td>无共享 scale</td></tr>
+<tr><td>MXFP8</td><td>8 bit</td><td>8/6 bit</td><td>32 元素 + 8 bit scale</td></tr>
+<tr><td>MXFP6</td><td>6 bit</td><td>8/6 bit</td><td>32 元素 + 8 bit scale；紧凑 6-bit packing</td></tr>
+<tr><td>MXFP4</td><td>4 bit</td><td>4 bit</td><td>32 元素 + 8 bit scale</td></tr>
+<tr><td>NVFP4</td><td>4 bit</td><td>4 bit</td><td>16 元素 + 8 bit scale，另加每 tensor 的 FP32 scale</td></tr>
+<tr><td>HiF4</td><td>4 bit</td><td>4 bit</td><td>64 元素 + 32 bit 分层元数据</td></tr>
+</tbody></table></div>
+<p>MXFP6 的不同编码保留名称，但在该参考设计中共享计算档位。三种 4-bit 格式也共享配置的峰值；这是一项候选硬件能力假设，不能据此认为现有任意 GPU/NPU 都原生支持所有格式，或它们的数值误差、功耗和访存相同。</p>
+<p>存储计数会按分组轴补齐整个 block。A 的分组沿 K；数学形状为 [K,N] 的 B 也沿 K 分组，因此使用第二倒数轴。它们不能都机械地按最后一维分组。宏 word 对齐、swizzle、复本和 scale 重读需要由后续局部存储后端补充。</p>
+<p class="small">格式依据：<a href="https://docs.nvidia.com/cutlass/4.6.2/media/docs/operators/api_reference/arguments.html#operands">CUTLASS scaled operands</a>、<a href="https://docs.nvidia.com/cuda/parallel-thread-execution/#tcgen05-mma-instructions">PTX block-scaled MMA</a>、<a href="https://developer.nvidia.com/blog/introducing-nvfp4-for-efficient-and-accurate-low-precision-inference/">NVIDIA NVFP4 说明</a>、<a href="https://arxiv.org/html/2602.11287v1">HiF4 原始论文</a>。这里实现描述和成本计数，没有实现数值量化器或低精度 GPU 算子。</p>
+
+<h2>4. K 扩展如何进入 SCALE-Sim</h2>
+<div class="table"><table>
+<thead><tr><th>配比</th><th>16-bit L</th><th>8/6-bit L</th><th>4-bit L</th><th>M/N 网格</th></tr></thead>
+<tbody><tr><td>1:2:4</td><td>16</td><td>32</td><td>64</td><td>固定 R×C</td></tr>
+<tr><td>1:2:6</td><td>16</td><td>32</td><td>96</td><td>固定 R×C</td></tr>
+<tr><td>1:2:8</td><td>16</td><td>32</td><td>128</td><td>固定 R×C</td></tr>
+<tr><td>1:4:8</td><td>16</td><td>64</td><td>128</td><td>固定 R×C</td></tr></tbody></table></div>
+<p>对于 D=A×B，每个 PE 的一次更新计算 L 个标量乘积并更新 FP32 部分和。将原 K 转成 Q=ceil(K/L) 个向量 token；SCALE-Sim 的 OS 单元对每个 token 执行一次点积更新。A/B 的 token 分别沿行/列传播，保留原有 skew 和排空时隙。</p>
+<pre>原问题：M × N × K
+点积模式：R × C 个 PE，每个 PE 每个阵列 step 处理 L 个乘积
+SCALE-Sim 计算拓扑：M_tile × N_tile × ceil(K/L)
+峰值：R × C × L MAC/step
+最后一组：只记录真实 K 的有效 MAC，其余为尾部空槽</pre>
+<p>这是对点积阵列的一种计算抽象：它要求点积结果/累加更新以及 PE 链路能按一个 step 工作，操作数和 scale 已就绪。L 从 64 增大到 96/128 后能否保持相同频率和更新速率，需要综合或实测数据支撑。当前没有将更长归约树的代价凭空设为已验证事实。</p>
+<div class="figure"><svg viewBox="0 0 1000 220" role="img" aria-label="一个点积PE处理K维向量，SCALE-Sim保留空间传播时序">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#175e98"/></marker></defs>
+<rect x="15" y="50" width="220" height="110" rx="10" fill="#e8f0f6" stroke="#9bb9ce"/><text x="125" y="85" text-anchor="middle" font-size="20">K=193，L=96</text><text x="125" y="120" text-anchor="middle" font-size="17">有效分组：96 / 96 / 1</text>
+<path d="M240 105H295" stroke="#175e98" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="305" y="28" width="350" height="155" rx="10" fill="#e6f4f1" stroke="#71a79e"/><text x="480" y="62" text-anchor="middle" font-size="19">OS 网格的每个 PE</text><text x="480" y="97" text-anchor="middle" font-size="17">A 向量 · B 向量 → dot(L)</text><text x="480" y="132" text-anchor="middle" font-size="17">FP32 resident accumulator</text><text x="480" y="162" text-anchor="middle" font-size="15">沿行/列传播向量 token</text>
+<path d="M663 105H720" stroke="#175e98" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="730" y="50" width="250" height="110" rx="10" fill="#e8f0f6" stroke="#9bb9ce"/><text x="855" y="86" text-anchor="middle" font-size="19">真实 SCALE-Sim 调度</text><text x="855" y="121" text-anchor="middle" font-size="17">3 个 K token + skew/drain</text>
+</svg></div>
+<p>当前后端只支持该 OS 映射。WS/IS 会改变空间维度和驻留位置，不能简单把 K 压缩后沿用同一解释；代码对此显式报错。SCALE-Sim 使用已安装、已验证的 2.0.2 计算组件，没有修改第三方源码，也没有把依赖升级为 v3。</p>
+
+<h2>5. 周期、尾块与多引擎调度</h2>
+<p>一个任务覆盖至多 R×C 的输出，沿完整 K 归约。多个独立任务按波次分配到芯片上的计算引擎；批量 GEMM 保持独立输出，不能拼接 K 后假装得到同一个问题。</p>
+<p>读取 SCALE-Sim demand matrix 的行数作为包含首拍的已分配时隙，不把最后一个从零开始的 timestamp 当作周期数。对于该版本、一个输出 tile，分配时隙为 Q+R+C−2；真实结果由组件生成，并不直接使用这个公式代替调用。</p>
+<div class="table"><table>
+<thead><tr><th>单个 16×16 网格，FP4</th><th>E64</th><th>E128</th><th>含义</th></tr></thead>
+<tbody><tr><td>K=4096</td><td>64+30=94 拍</td><td>32+30=62 拍</td><td>1.516×，填充/排空没有减半</td></tr>
+<tr><td>K=16</td><td>1+30=31 拍</td><td>1+30=31 拍</td><td>没有收益；新增点积槽无法被填满</td></tr>
+<tr><td>K=193，E96</td><td colspan="2">3 组、最后 1 个有效元素；K packing=193/288</td><td>保留真实 MAC 数，不把 padding 算成有用工作</td></tr></tbody></table></div>
+<p>利用率分别报告 K packing、M/N 空间填充、波次填充和流水线效率。整机有效利用率为有效 MAC/(所有引擎峰值×计算周期)，避免把只观察忙引擎得到的高利用率当作整个芯片的利用率。</p>
+
+<h2>6. 已接入的代码与调用方式</h2>
+<div class="flow">
+<div><strong>格式</strong><code>software_model/utils.py</code><br>计算档位、scale、分组、storage_bytes</div>
+<div><strong>硬件</strong><code>hardware_model/precision.py</code><br>基础 L 与三档倍率</div>
+<div><strong>周期</strong><code>systolic_array_model/precision_k.py</code><br>SCALE-Sim token 调度、波次与利用率</div>
+<div><strong>算子</strong><code>software_model/matmul.py</code><br>普通/批量 GEMM，M=1 也进入新后端</div>
+<div><strong>实验</strong><code>scripts/study_precision_ratios.py</code><br>统一格式扫描、PPA、留出集统计</div>
+</div>
+<pre>from hardware_model.precision import KExpansionProfile
+from hardware_model.compute_module import SystolicArray
+from software_model.utils import data_type_dict, Tensor
+from software_model.matmul import Matmul
+
+array = SystolicArray(16, 16, 16, 2, 4,
+    precision_profile=KExpansionProfile(16, (1, 2, 6)))
+# 将 array 放入自己的 Core / ComputeModule / Device。
+dtype = data_type_dict["mxfp4"]
+gemm = Matmul(dtype, output_type=data_type_dict["bf16"])
+gemm(Tensor([128, 4096], dtype), Tensor([4096, 4096], dtype))
+seconds = gemm.compile_and_simulate(device, "precision-k")
+details = gemm.precision_result</pre>
+<p>新硬件必须显式设置 precision_profile；未设置的历史配置保留旧路径。启用后，三档共享同一阵列，旧 mac_per_cycle 不再作为第二次倍率应用。JSON 硬件适配器也支持在 systolic_array 下增加 precision_profile。</p>
+<pre>"precision_profile": {
+  "base_dot_length": 16,
+  "ratios": [1, 2, 8]
+}</pre>
+<p>旧按 FPU 估算阵列面积的函数遇到新 profile 会拒绝计算，避免遗漏低精度新增硬件却仍报告旧面积。精度 profile 的面积使用外部 PPA 表。</p>
+
+<h2>7. SRAM：本轮的精确范围与下一步衔接</h2>
+<p>本轮输出的是计算时间线和向量 token 数，token 既不是 SRAM 地址，也不是一次完整 SRAM word 事务。尚未由源数据、广播寄存器、collector、bank 和端口仲裁还原实际供数，所以不会声称已经得到真实 L0 每拍读取或硬件可行性。</p>
+<p>算子入口还给出 max(计算调度时间，HBM/L2 必需传输时间) 的理想重叠估计。必需字节计入 A/B 数据和元数据、D 写回；默认 β=0，不读初始 C。它没有计入跨 tile 重复搬运、局部供数、转换或量化计算，不是实测 kernel 延迟。</p>
+<p>下一阶段在同一 profile 下接入：操作数载入与驻留规则 → 每拍请求 → bank/端口仲裁 → 数据就绪 → 阵列推进。复用寄存器能否摊薄 SRAM 带宽，需要通过加载截止时间、寄存器容量与缓冲槽判断。</p>
+<div class="table"><table><thead><tr><th>存储实验</th><th>保持/改变</th><th>必须报告</th></tr></thead><tbody>
+<tr><td>现有 SRAM</td><td>容量、bank、lane、端口都保持</td><td>新增计算后产生多少阻塞；原带宽余量能支撑哪些模式</td></tr>
+<tr><td>联合升级</td><td>在固定总容量下搜索宏组织</td><td>为达到供数要求增加多少面积、动态能耗、泄漏和互连成本</td></tr>
+<tr><td>完整预算</td><td>把新增 TC+SRAM+RF+控制放回芯片预算</td><td>核数/频率是否改变，以及全芯片结果</td></tr>
+</tbody></table></div>
+<p>已有 <code>cost_model/cacti.py</code>、<code>local_sram.py</code> 可复用宏成本查询；当前 <code>dot_product_sram.py</code> 的结构化访问假设不能自动视为本后端的已验证物理访存。两者尚未闭环。</p>
+
+<h2>8. 已跑通的示例：计算收益不等于负载收益</h2>
+<p>下面数据来自本分支实际调用 SCALE-Sim 的扫描：4 组示例形状、7 种格式、4 个配比，共 112 组。示例是人为配置的形状代理，非模型实测；非 GEMM 时间为零。蓝色是计算调度加速比，绿色加入必需访存与理想重叠估计。两者都以相同格式的 1:2:4 为基准。</p>
+<div class="controls"><label>格式 <select id="format"></select></label><label>负载 <select id="workload"></select></label></div>
+<div class="figure"><svg id="chart" viewBox="0 0 950 345" role="img" aria-label="各配比计算调度与访存重叠估计的加速比"></svg><div class="legend small"><span><i class="dot" style="background:#175e98"></i>计算调度</span><span><i class="dot" style="background:#067b73"></i>理想访存重叠估计</span></div></div>
+<div class="table"><table id="results"><thead><tr><th>配比</th><th>计算加速比</th><th>重叠估计加速比</th><th>计算时间 / μs</th><th>重叠估计时间 / μs</th><th>TC 面积比</th></tr></thead><tbody></tbody></table></div>
+<p class="small">没有填写候选 PPA 时，面积显示“待提供”；不会根据精度位宽或吞吐倍率生成看似真实的面积/功耗。蓝绿之间的差距仅用于演示瓶颈分析方法。</p>
+
+<h2>9. 如何提供面积和功耗</h2>
+<p>模板为 <code>configs/precision_ppa_template.json</code>。一份文件对应同工艺、电压、频率条件下的一组候选设计。面积表示一个完整共享多精度 Tensor Core 相对基准的面积，不能把三个模式面积相加。</p>
+<pre>{
+  "scope": "one_tensor_core",
+  "process_nm": 22,
+  "voltage_v": null,
+  "frequency_hz": 1000000000,
+  "profiles": {
+    "1:2:4": {"area_relative": 1.0,
+      "active_power_relative": {"16": 1.0, "8": 1.0, "4": 1.0}},
+    "1:2:8": {"area_relative": null,
+      "active_power_relative": {"16": null, "8": null, "4": null},
+      "active_power_relative_by_format": {"hif4": null}}
+  }
+}</pre>
+<p>每种格式的功耗比应相对该格式的基准设计；可用 per-format 字段覆盖共享档位。当前能输出 TC 面积归一化吞吐比，以及按提供的活动功耗×分配给任务的阵列周期计算的活动能量代理。后者没有空闲泄漏、存储和全芯片能耗，不能直接称为 tokens/J。</p>
+<p>12nm 和 22nm 各自建立一组表即可开展同工艺相对比较。跨工艺需要单独校准；当前 CACTI 适配没有已验证的 12nm 技术模型。更长点积的归约树、scale 支持、FP32 累加反馈和互连必须包含在 PPA 的明确统计范围中。</p>
+
+<h2>10. 避免专用设计：预先冻结的实验矩阵</h2>
+<div class="table"><table>
+<thead><tr><th>维度</th><th>建议覆盖</th><th>要防止的偏差</th></tr></thead><tbody>
+<tr><td>模型结构</td><td>Dense GQA、不同 Attention 结构、MoE；同家族不同规模</td><td>仅换同一模型的 hidden size 不能证明跨家族通用性</td></tr>
+<tr><td>运行阶段</td><td>Prefill、decode、批处理 decode、专家小 batch</td><td>只挑大 GEMM，遗漏内存受限和利用率低的场景</td></tr>
+<tr><td>长度/batch</td><td>短/长上下文，batch=1 与服务目标范围内的 batch</td><td>用大 batch 的收益代表低延迟部署</td></tr>
+<tr><td>格式</td><td>BF16 控制组、MXFP8/6、至少两种 4-bit 格式；每次配比比较固定格式</td><td>把量化收益混进硬件收益，或忽略元数据差异</td></tr>
+<tr><td>形状</td><td>长/短 K，M 很小、N 很大，K=96/128 边界和尾数，真实非对齐维度</td><td>只选被新点积长度整除的尺寸</td></tr>
+<tr><td>质量</td><td>每个模型/格式独立量化与质量评估；固定可接受门槛</td><td>性能模拟器不能证明所有算子都可无损转成 FP4</td></tr>
+<tr><td>选型/验证</td><td>按模型家族分组，预留整个家族和未见 batch/长度；选型后冻结设计</td><td>根据测试集反复选择配比，造成数据泄漏</td></tr>
+</tbody></table></div>
+<p>当前配置中的 design/holdout 字段与统计入口已经实现，但示例留出集仍是形状代理。正式研究需要替换为真实模型轨迹，记录框架、kernel、量化配置、形状分布和哈希；不能把 112 组示例描述成 112 个真实模型实验。</p>
+<p>部署组合的权重应来自事先给定的部署目标或明确的等权规则。建议同时报告按工作负载等权的几何平均、最差加速比、退化比例、各模型/阶段明细，并补充不同合理权重下的敏感性。不要让一个有大量重复形状的模型在统计中自动获得更高权重。</p>
+
+<h2>11. 核心对照与论文图表</h2>
+<div class="table"><table><thead><tr><th>实验/图</th><th>输入与对照</th><th>支撑的结论</th></tr></thead><tbody>
+<tr><td>E1：形状收益图</td><td>固定 M/N 网格，扫 K、M、batch、四种配比；包含尾块</td><td>收益来自哪些 K 并行度与空间利用率条件，何时饱和</td></tr>
+<tr><td>E2：逐算子分解</td><td>相同模型与格式下比较各 GEMM 和非 GEMM 时间</td><td>端到端收益来自何处；Amdahl 与瓶颈迁移</td></tr>
+<tr><td>E3：存储消融</td><td>现有 SRAM / 联合升级 / 理想无限供数三组</td><td>计算上限与真实供数之间的差距，以及存储升级价值</td></tr>
+<tr><td>E4：等预算竞争</td><td>低精度 K 扩展 / 增加传统 1:2:4 计算 / 增加局部带宽</td><td>额外资源为什么值得用于改变配比</td></tr>
+<tr><td>E5：跨家族留出</td><td>只在设计集选一个硬件方案，原样运行留出集</td><td>收益是否迁移；报告不受益/退化的模型和原因</td></tr>
+<tr><td>E6：鲁棒性</td><td>变动部署权重、SRAM 有效效率、频率、PPA 误差</td><td>最佳配比是否稳定，收益有无超过建模不确定性</td></tr>
+<tr><td>E7：质量约束</td><td>独立验证各模型的固定精度策略</td><td>结果对应实际可部署的低精度负载</td></tr>
+</tbody></table></div>
+<p>可在设计集选择：最大化加权对数吞吐收益，同时限制面积、功耗和高精度/尾部场景退化。选择规则与退化阈值必须在看留出结果之前确定。本轮脚本提供分组统计，没有自动使用留出结果推荐最优芯片。</p>
+
+<h2>12. 固定芯片预算下的公平比较</h2>
+<pre>A_core(design) = A_other_core + n_TC × A_TC(design)
+                 + A_operand_storage(design) + A_added_interconnect(design)
+N_core(design) = floor((A_die_budget - A_fixed_IO) / A_core(design))</pre>
+<p>上式只是预算组织方式：必须使用互不重复的面积范围，原 core 中已包含的 SRAM/RF 不应再次计费。减少核数后，向量、寄存器、局部 SRAM、调度等资源也可能一起减少；不能只把 TC 数乘一个面积比例而保留其他核心资源不变。</p>
+<p>固定功耗实验需要活动率、泄漏、存储/互连、频率电压等信息。当前提供的 TC 相对功耗只覆盖其中一部分。应先报告固定核数的增量成本，再补全全芯片成本，避免把 TC 面积效率当作全芯片效率。</p>
+<p>一个更完整的对照是：给传统配比相同的新增面积，允许它选择增加计算或带宽；然后比较统一低精度模型和 BF16 控制负载。若 1:2:8 仅在理想供数且不计面积的条件下领先，应该将其判为条件性收益。</p>
+
+<h2>13. 复现命令与接入现有 Transformer</h2>
+<pre># 四配比 × 七格式 × 四代理负载；原生 token trace 可选
+.venv/bin/python scripts/study_precision_ratios.py \
+  --config configs/precision_ratio_study.json \
+  --ppa configs/precision_ppa_template.json \
+  --output-dir artifacts/precision-ratios/my-run --trace
+
+# 从仓库现有 dense Transformer block 导出形状；不是现代模型性能实测
+.venv/bin/python scripts/export_transformer_gemms.py \
+  --hidden 4096 --heads 32 --batch 1 --sequence 512 --phase prefill \
+  --output artifacts/precision-ratios/legacy-prefill.json
+.venv/bin/python scripts/study_precision_ratios.py \
+  --config artifacts/precision-ratios/legacy-prefill.json \
+  --output-dir artifacts/precision-ratios/legacy-prefill
+
+.venv/bin/python -m unittest discover -s tests -v</pre>
+<p>输出 <code>result.json</code> 包含逐算子调度、存储计数、利用率、源文件哈希、SCALE-Sim 版本及计算组件哈希；<code>summary.csv</code> 便于画图。可选 NPZ 是原生向量 token demand matrix，不能当作 SRAM trace。输出目录必须为空，以保留既有结果。</p>
+<p>真实模型接入时，将 workload.ops 换为实际 GEMM 列表；count 表示重复执行次数，batch_count 表示独立批量矩阵，不等于请求 batch。non_gemm_seconds 表示这一整份 workload 的其他时间，需与重复层数和运行阶段保持同一统计范围。</p>
+
+<h2>14. 验证与实施顺序</h2>
+<div class="table"><table><thead><tr><th>阶段</th><th>当前状态/下一步</th><th>验证条件</th></tr></thead><tbody>
+<tr><td>P0：格式与计算</td><td>已实现。格式、尾块、周期、波次、普通/批量 GEMM、JSON 接入。</td><td>测试重放真实 token 的行/列传播，用整数向量点积与 NumPy GEMM 对照；不宣称浮点误差验证。</td></tr>
+<tr><td>P0：历史回归</td><td>运行原有 CPU 基线，保留旧配置、旧查表与标量后端。</td><td>9 项基线与原始 CSV 哈希保持；独立验证新路径不会误用旧面积。</td></tr>
+<tr><td>P1：存储闭环</td><td>增加已定义微架构的加载、驻留、scale、端口/银行调度，并接入宏成本。</td><td>小阵列逐拍请求/服务轨迹；尾部、缓冲翻转、冲突与阻塞。</td></tr>
+<tr><td>P1：目标芯片校准</td><td>用现有 H100/B200/B300 与 Ascend 平台验证对应原生模式。</td><td>计算饱和、带宽饱和、小形状、访存计数的分离微基准；按形状保留验证集。</td></tr>
+<tr><td>P2：设计研究</td><td>接入真实 PPA 和真实模型；冻结组合权重及候选选择，再运行留出集。</td><td>等预算对照、退化约束、Pareto 与敏感性；自定义配比需综合/RTL/单元数据支撑。</td></tr>
+</tbody></table></div>
+<p>现有芯片只能校准其实际支持的模式和对应层次，无法直接证明未制造的 1:2:6 设计。不要用一个全局拟合因子补偿所有形状与格式；应分开校准计算更新、填充排空、存储、转换和启动，并检查设计排序是否在误差范围内稳定。</p>
+
+<footer>本报告对应一个可运行的参考计算模型和研究实施方案。相对 PPA 待输入；示例结果不是量化精度验证、GPU/NPU 性能实测或全芯片最优配比结论。</footer>
+</main>
+<script id="study-data" type="application/json">{"rows":[{"workload":"dense_prefill_proxy","format":"fp16","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00033672000000000004,"estimate_seconds":0.000379060224,"tc_area_relative":1.0},{"workload":"dense_prefill_proxy","format":"fp16","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00033672000000000004,"estimate_seconds":0.000379060224,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"fp16","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00033672000000000004,"estimate_seconds":0.000379060224,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"fp16","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00033672000000000004,"estimate_seconds":0.000379060224,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"bf16","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00033672000000000004,"estimate_seconds":0.000379060224,"tc_area_relative":1.0},{"workload":"dense_prefill_proxy","format":"bf16","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00033672000000000004,"estimate_seconds":0.000379060224,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"bf16","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00033672000000000004,"estimate_seconds":0.000379060224,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"bf16","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00033672000000000004,"estimate_seconds":0.000379060224,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"mxfp8","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00018312,"estimate_seconds":0.000195452928,"tc_area_relative":1.0},{"workload":"dense_prefill_proxy","format":"mxfp8","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00018312,"estimate_seconds":0.000195452928,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"mxfp8","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00018312,"estimate_seconds":0.000195452928,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"mxfp8","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.7223476297968396,"compute_seconds":0.00010632,"estimate_seconds":0.000195452928,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"mxfp6","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00018312,"estimate_seconds":0.00018312,"tc_area_relative":1.0},{"workload":"dense_prefill_proxy","format":"mxfp6","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00018312,"estimate_seconds":0.00018312,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"mxfp6","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00018312,"estimate_seconds":0.00018312,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"mxfp6","ratio":"1:4:8","speedup":1.2367090248962653,"compute_speedup":1.7223476297968396,"compute_seconds":0.00010632,"estimate_seconds":0.0001480704,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"mxfp4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00010632,"estimate_seconds":0.00010852569599999999,"tc_area_relative":1.0},{"workload":"dense_prefill_proxy","format":"mxfp4","ratio":"1:2:6","speedup":1.0778427813033926,"compute_speedup":1.3118152206100089,"compute_seconds":8.1048e-05,"estimate_seconds":0.000100687872,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"mxfp4","ratio":"1:2:8","speedup":1.0778427813033926,"compute_speedup":1.5653710247349824,"compute_seconds":6.792e-05,"estimate_seconds":0.000100687872,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"mxfp4","ratio":"1:4:8","speedup":1.0778427813033926,"compute_speedup":1.5653710247349824,"compute_seconds":6.792e-05,"estimate_seconds":0.000100687872,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"nvfp4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00010632,"estimate_seconds":0.00011017639599999999,"tc_area_relative":1.0},{"workload":"dense_prefill_proxy","format":"nvfp4","ratio":"1:2:6","speedup":1.0334453670530064,"compute_speedup":1.3118152206100089,"compute_seconds":8.1048e-05,"estimate_seconds":0.00010661076000000001,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"nvfp4","ratio":"1:2:8","speedup":1.0334453670530064,"compute_speedup":1.5653710247349824,"compute_seconds":6.792e-05,"estimate_seconds":0.00010661076000000001,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"nvfp4","ratio":"1:4:8","speedup":1.0334453670530064,"compute_speedup":1.5653710247349824,"compute_seconds":6.792e-05,"estimate_seconds":0.00010661076000000001,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"hif4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":0.00010632,"estimate_seconds":0.000110176384,"tc_area_relative":1.0},{"workload":"dense_prefill_proxy","format":"hif4","ratio":"1:2:6","speedup":1.0334459524358384,"compute_speedup":1.3118152206100089,"compute_seconds":8.1048e-05,"estimate_seconds":0.000106610688,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"hif4","ratio":"1:2:8","speedup":1.0334459524358384,"compute_speedup":1.5653710247349824,"compute_seconds":6.792e-05,"estimate_seconds":0.000106610688,"tc_area_relative":null},{"workload":"dense_prefill_proxy","format":"hif4","ratio":"1:4:8","speedup":1.0334459524358384,"compute_speedup":1.5653710247349824,"compute_seconds":6.792e-05,"estimate_seconds":0.000106610688,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"fp16","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0594e-05,"estimate_seconds":0.00031469875199999995,"tc_area_relative":1.0},{"workload":"dense_decode_proxy","format":"fp16","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0594e-05,"estimate_seconds":0.00031469875199999995,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"fp16","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0594e-05,"estimate_seconds":0.00031469875199999995,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"fp16","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0594e-05,"estimate_seconds":0.00031469875199999995,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"bf16","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0594e-05,"estimate_seconds":0.00031469875199999995,"tc_area_relative":1.0},{"workload":"dense_decode_proxy","format":"bf16","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0594e-05,"estimate_seconds":0.00031469875199999995,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"bf16","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0594e-05,"estimate_seconds":0.00031469875199999995,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"bf16","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0594e-05,"estimate_seconds":0.00031469875199999995,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"mxfp8","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.762e-06,"estimate_seconds":0.000162266544,"tc_area_relative":1.0},{"workload":"dense_decode_proxy","format":"mxfp8","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.762e-06,"estimate_seconds":0.000162266544,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"mxfp8","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.762e-06,"estimate_seconds":0.000162266544,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"mxfp8","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.7220561864913329,"compute_seconds":3.3460000000000002e-06,"estimate_seconds":0.000162266544,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"mxfp6","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.762e-06,"estimate_seconds":0.0001229292,"tc_area_relative":1.0},{"workload":"dense_decode_proxy","format":"mxfp6","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.762e-06,"estimate_seconds":0.0001229292,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"mxfp6","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.762e-06,"estimate_seconds":0.0001229292,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"mxfp6","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.7220561864913329,"compute_seconds":3.3460000000000002e-06,"estimate_seconds":0.0001229292,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"mxfp4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":3.3460000000000002e-06,"estimate_seconds":8.3591856e-05,"tc_area_relative":1.0},{"workload":"dense_decode_proxy","format":"mxfp4","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.311642493139945,"compute_seconds":2.5510000000000002e-06,"estimate_seconds":8.3591856e-05,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"mxfp4","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.5650140318054258,"compute_seconds":2.138e-06,"estimate_seconds":8.3591856e-05,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"mxfp4","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.5650140318054258,"compute_seconds":2.138e-06,"estimate_seconds":8.3591856e-05,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"nvfp4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":3.3460000000000002e-06,"estimate_seconds":8.850909599999998e-05,"tc_area_relative":1.0},{"workload":"dense_decode_proxy","format":"nvfp4","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.311642493139945,"compute_seconds":2.5510000000000002e-06,"estimate_seconds":8.850909599999998e-05,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"nvfp4","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.5650140318054258,"compute_seconds":2.138e-06,"estimate_seconds":8.850909599999998e-05,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"nvfp4","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.5650140318054258,"compute_seconds":2.138e-06,"estimate_seconds":8.850909599999998e-05,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"hif4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":3.3460000000000002e-06,"estimate_seconds":8.8509024e-05,"tc_area_relative":1.0},{"workload":"dense_decode_proxy","format":"hif4","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.311642493139945,"compute_seconds":2.5510000000000002e-06,"estimate_seconds":8.8509024e-05,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"hif4","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.5650140318054258,"compute_seconds":2.138e-06,"estimate_seconds":8.8509024e-05,"tc_area_relative":null},{"workload":"dense_decode_proxy","format":"hif4","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.5650140318054258,"compute_seconds":2.138e-06,"estimate_seconds":8.8509024e-05,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"fp16","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":9.632e-06,"estimate_seconds":0.000269811712,"tc_area_relative":1.0},{"workload":"expert_microbatch_proxy","format":"fp16","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":9.632e-06,"estimate_seconds":0.000269811712,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"fp16","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":9.632e-06,"estimate_seconds":0.000269811712,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"fp16","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":9.632e-06,"estimate_seconds":0.000269811712,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"bf16","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":9.632e-06,"estimate_seconds":0.000269811712,"tc_area_relative":1.0},{"workload":"expert_microbatch_proxy","format":"bf16","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":9.632e-06,"estimate_seconds":0.000269811712,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"bf16","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":9.632e-06,"estimate_seconds":0.000269811712,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"bf16","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":9.632e-06,"estimate_seconds":0.000269811712,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"mxfp8","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.536e-06,"estimate_seconds":0.000139121664,"tc_area_relative":1.0},{"workload":"expert_microbatch_proxy","format":"mxfp8","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.536e-06,"estimate_seconds":0.000139121664,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"mxfp8","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.536e-06,"estimate_seconds":0.000139121664,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"mxfp8","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.5871559633027523,"compute_seconds":3.488e-06,"estimate_seconds":0.000139121664,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"mxfp6","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.536e-06,"estimate_seconds":0.0001053952,"tc_area_relative":1.0},{"workload":"expert_microbatch_proxy","format":"mxfp6","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.536e-06,"estimate_seconds":0.0001053952,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"mxfp6","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":5.536e-06,"estimate_seconds":0.0001053952,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"mxfp6","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.5871559633027523,"compute_seconds":3.488e-06,"estimate_seconds":0.0001053952,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"mxfp4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":3.488e-06,"estimate_seconds":7.1668736e-05,"tc_area_relative":1.0},{"workload":"expert_microbatch_proxy","format":"mxfp4","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.231638418079096,"compute_seconds":2.832e-06,"estimate_seconds":7.1668736e-05,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"mxfp4","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.4155844155844155,"compute_seconds":2.464e-06,"estimate_seconds":7.1668736e-05,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"mxfp4","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.4155844155844155,"compute_seconds":2.464e-06,"estimate_seconds":7.1668736e-05,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"nvfp4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":3.488e-06,"estimate_seconds":7.5884736e-05,"tc_area_relative":1.0},{"workload":"expert_microbatch_proxy","format":"nvfp4","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.231638418079096,"compute_seconds":2.832e-06,"estimate_seconds":7.5884736e-05,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"nvfp4","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.4155844155844155,"compute_seconds":2.464e-06,"estimate_seconds":7.5884736e-05,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"nvfp4","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.4155844155844155,"compute_seconds":2.464e-06,"estimate_seconds":7.5884736e-05,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"hif4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":3.488e-06,"estimate_seconds":7.5884544e-05,"tc_area_relative":1.0},{"workload":"expert_microbatch_proxy","format":"hif4","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.231638418079096,"compute_seconds":2.832e-06,"estimate_seconds":7.5884544e-05,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"hif4","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.4155844155844155,"compute_seconds":2.464e-06,"estimate_seconds":7.5884544e-05,"tc_area_relative":null},{"workload":"expert_microbatch_proxy","format":"hif4","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.4155844155844155,"compute_seconds":2.464e-06,"estimate_seconds":7.5884544e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"fp16","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.2736000000000001e-05,"estimate_seconds":3.5651584e-05,"tc_area_relative":1.0},{"workload":"short_k_attention_proxy","format":"fp16","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.2736000000000001e-05,"estimate_seconds":3.5651584e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"fp16","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.2736000000000001e-05,"estimate_seconds":3.5651584e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"fp16","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.2736000000000001e-05,"estimate_seconds":3.5651584e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"bf16","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.2736000000000001e-05,"estimate_seconds":3.5651584e-05,"tc_area_relative":1.0},{"workload":"short_k_attention_proxy","format":"bf16","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.2736000000000001e-05,"estimate_seconds":3.5651584e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"bf16","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.2736000000000001e-05,"estimate_seconds":3.5651584e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"bf16","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.2736000000000001e-05,"estimate_seconds":3.5651584e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"mxfp8","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0688e-05,"estimate_seconds":1.8382848e-05,"tc_area_relative":1.0},{"workload":"short_k_attention_proxy","format":"mxfp8","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0688e-05,"estimate_seconds":1.8382848e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"mxfp8","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0688e-05,"estimate_seconds":1.8382848e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"mxfp8","ratio":"1:4:8","speedup":1.0,"compute_speedup":1.1059602649006621,"compute_seconds":9.664000000000001e-06,"estimate_seconds":1.8382848e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"mxfp6","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0688e-05,"estimate_seconds":1.5667199999999998e-05,"tc_area_relative":1.0},{"workload":"short_k_attention_proxy","format":"mxfp6","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0688e-05,"estimate_seconds":1.5667199999999998e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"mxfp6","ratio":"1:2:8","speedup":1.0,"compute_speedup":1.0,"compute_seconds":1.0688e-05,"estimate_seconds":1.5667199999999998e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"mxfp6","ratio":"1:4:8","speedup":1.0337837837837835,"compute_speedup":1.1059602649006621,"compute_seconds":9.664000000000001e-06,"estimate_seconds":1.51552e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"mxfp4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":9.664000000000001e-06,"estimate_seconds":1.2926976000000001e-05,"tc_area_relative":1.0},{"workload":"short_k_attention_proxy","format":"mxfp4","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0168350168350169,"compute_seconds":9.504e-06,"estimate_seconds":1.2926976000000001e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"mxfp4","ratio":"1:2:8","speedup":1.0202036528204301,"compute_speedup":1.055944055944056,"compute_seconds":9.152e-06,"estimate_seconds":1.2670975999999999e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"mxfp4","ratio":"1:4:8","speedup":1.0202036528204301,"compute_speedup":1.055944055944056,"compute_seconds":9.152e-06,"estimate_seconds":1.2670975999999999e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"nvfp4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":9.664000000000001e-06,"estimate_seconds":1.3205516000000001e-05,"tc_area_relative":1.0},{"workload":"short_k_attention_proxy","format":"nvfp4","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0168350168350169,"compute_seconds":9.504e-06,"estimate_seconds":1.3205516000000001e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"nvfp4","ratio":"1:2:8","speedup":1.0197690786281126,"compute_speedup":1.055944055944056,"compute_seconds":9.152e-06,"estimate_seconds":1.2949515999999999e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"nvfp4","ratio":"1:4:8","speedup":1.0197690786281126,"compute_speedup":1.055944055944056,"compute_seconds":9.152e-06,"estimate_seconds":1.2949515999999999e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"hif4","ratio":"1:2:4","speedup":1.0,"compute_speedup":1.0,"compute_seconds":9.664000000000001e-06,"estimate_seconds":1.3205504e-05,"tc_area_relative":1.0},{"workload":"short_k_attention_proxy","format":"hif4","ratio":"1:2:6","speedup":1.0,"compute_speedup":1.0168350168350169,"compute_seconds":9.504e-06,"estimate_seconds":1.3205504e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"hif4","ratio":"1:2:8","speedup":1.0197690969476514,"compute_speedup":1.055944055944056,"compute_seconds":9.152e-06,"estimate_seconds":1.2949504e-05,"tc_area_relative":null},{"workload":"short_k_attention_proxy","format":"hif4","ratio":"1:4:8","speedup":1.0197690969476514,"compute_speedup":1.055944055944056,"compute_seconds":9.152e-06,"estimate_seconds":1.2949504e-05,"tc_area_relative":null}],"metadata":{"manifest":{"commit":"2e015fd2ee750e6cad8d7152df52551e5b41ef20","source_sha256":{"software_model/utils.py":"5646e5a96fdc5f76166016149afe4de86c3ded2d0826f5c426d0ca79c022f3f5","software_model/matmul.py":"1f1ecd00b9b76a11bdd47734c0841d5ba9999d139f616f5bafd0d7f95f498d1e","hardware_model/compute_module.py":"4ef783061cfb80a375169a07423a42d4b8ffa669c85c6fa5b7def145b0a77221","hardware_model/precision.py":"00c41db89545f87ff0225d128106d57d489ae2572e621acda236b11f7208ab09","systolic_array_model/precision_k.py":"1dfd402ecb71f4e93a1da31a3fa4c4706735ff1c1a40f0a464a7c02dd0fe3e93","scripts/study_precision_ratios.py":"e7cba5508eabb6797bb479aaa837a3c526e717eea0f3176cd64bd4f8eec4fee6","cost_model/cost_model.py":"c76fd0e3037abc359f611631f3ea62647d3b716fa0e93bd2bd97d5a79bc3b8fc","design_space_exploration/dse.py":"ff0309ad4329d097aed60ed8646bd3ee219ff840c3f348a4f7a418516a083f7a"},"config_sha256":"d4de6bb392d6bfd33c8166e1660f07dd2c8087d5f57af62678a98fc8b2fb35ed","ppa_sha256":"dea953c99d173a636ef281b8b18d0a15c57f934560672bc0cbba85dc300e8684"},"provenance":{"backend":"scalesim-os-vector-dot-v1","scalesim_version":"2.0.2","compute_source_sha256":"4e2afaa9d8cacc268cafe042fa73426e9a47c90e71cf9d604be085071d177d93","validated_version":"2.0.2"},"description":"Illustrative shape proxies only; not measured or extracted model traces."}}</script>
+<script>
+const study=JSON.parse(document.getElementById('study-data').textContent), rows=study.rows;
+const f=document.getElementById('format'),w=document.getElementById('workload');
+for(const x of [...new Set(rows.map(r=>r.format))])f.add(new Option(x,x));
+for(const x of [...new Set(rows.map(r=>r.workload))])w.add(new Option(x,x));
+if([...f.options].some(o=>o.value==='mxfp4'))f.value='mxfp4';
+function draw(){const selected=rows.filter(r=>r.format===f.value&&r.workload===w.value);const max=Math.max(2,...selected.map(r=>r.compute_speedup),...selected.map(r=>r.speedup));let svg='';
+for(let i=0;i<selected.length;i++){const r=selected[i],y=38+i*73;svg+=`<text x="10" y="${y+23}" font-size="18" fill="#182c40">${r.ratio}</text>`;for(const [j,key,color]of[[0,'compute_speedup','#175e98'],[1,'speedup','#067b73']]){const width=650*r[key]/max;svg+=`<rect x="130" y="${y+j*24}" width="${width}" height="19" fill="${color}" rx="3"/><text x="${140+width}" y="${y+j*24+15}" font-size="16" fill="#182c40">${r[key].toFixed(3)}×</text>`;}}
+document.getElementById('chart').innerHTML=svg;
+document.querySelector('#results tbody').innerHTML=selected.map(r=>`<tr><td>${r.ratio}</td><td>${r.compute_speedup.toFixed(3)}×</td><td>${r.speedup.toFixed(3)}×</td><td>${(r.compute_seconds*1e6).toFixed(3)}</td><td>${(r.estimate_seconds*1e6).toFixed(3)}</td><td>${r.tc_area_relative===null?'待提供':r.tc_area_relative.toFixed(3)}</td></tr>`).join('');
+}
+f.addEventListener('change',draw);w.addEventListener('change',draw);draw();
+</script>
+</body></html>

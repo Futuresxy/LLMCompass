@@ -2,7 +2,7 @@ from utils import size
 from typing import List, Tuple
 from hardware_model.device import Device
 from software_model.operators import Operator
-from software_model.utils import Tensor, DataType
+from software_model.utils import Tensor, DataType, data_type_dict
 from math import ceil, log2, floor
 import torch
 import time
@@ -15,8 +15,9 @@ import copy
 
 
 class BatchedMatmul(Operator):
-    def __init__(self, data_type: DataType):
+    def __init__(self, data_type: DataType, output_type=None):
         super().__init__(0, 0, 0, 0, data_type)
+        self.output_type = output_type or data_type
         self.input1_shape = None
         self.input2_shape = None
         self.output_shape = None
@@ -34,12 +35,22 @@ class BatchedMatmul(Operator):
         assert self.input2_shape[-2] == self.K
         self.N = self.input2_shape[-1]
         self.output_shape = self.input1_shape[:-2] + [self.M, self.N]
-        output = Tensor(self.output_shape, self.data_type)
+        output = Tensor(self.output_shape, self.output_type)
         return output
 
     def roofline_model(self, pcb_module: Device):
-        matmul = Matmul(self.data_type)
-        _ = matmul(Tensor([self.M, self.K]), Tensor([self.K, self.N]))
+        if pcb_module.compute_module.core.systolic_array.precision_profile is not None:
+            cm = pcb_module.compute_module
+            io_bytes = (self.data_type.storage_bytes([self.bs, self.M, self.K])
+                        + self.data_type.storage_bytes([self.bs, self.K, self.N], block_axis=-2)
+                        + self.output_type.storage_bytes([self.bs, self.M, self.N]))
+            self.roofline_latency = max(
+                2 * self.bs * self.M * self.N * self.K / cm.systolic_flops(self.data_type),
+                io_bytes / min(pcb_module.io_module.bandwidth,
+                               cm.l2_bandwidth_per_cycle * cm.clock_freq))
+            return self.roofline_latency
+        matmul = Matmul(self.data_type, self.output_type)
+        _ = matmul(Tensor([self.M, self.K], self.data_type), Tensor([self.K, self.N], self.data_type))
         matmul_latency = matmul.roofline_model(pcb_module)
         self.roofline_latency = matmul_latency * self.bs
         return self.roofline_latency
@@ -55,15 +66,24 @@ class BatchedMatmul(Operator):
     #     return self.latency
 
     def compile_and_simulate(self, pcb_module: Device, compile_mode: str):
-        matmul = Matmul(self.data_type)
-        _ = matmul(Tensor([self.M, self.K]), Tensor([self.K, self.N]))
+        if pcb_module.compute_module.core.systolic_array.precision_profile is not None:
+            from systolic_array_model.precision_k import analyze_matmul
+            self.precision_result = analyze_matmul(
+                self.M, self.N, self.K, self.data_type, self.output_type,
+                pcb_module, batch_count=self.bs)
+            self.latency = self.precision_result["latency_seconds"]
+            return self.latency
+        if self.data_type.block_size != 1:
+            raise ValueError("Block formats require an explicit precision_profile")
+        matmul = Matmul(self.data_type, self.output_type)
+        _ = matmul(Tensor([self.M, self.K], self.data_type), Tensor([self.K, self.N], self.data_type))
         matmul_latency1 = (
             matmul.compile_and_simulate(pcb_module, compile_mode) * self.bs
         )
 
-        matmul = Matmul(self.data_type)
+        matmul = Matmul(self.data_type, self.output_type)
         _ = matmul(
-            Tensor([self.M, self.K * self.bs]), Tensor([self.K * self.bs, self.N])
+            Tensor([self.M, self.K * self.bs], self.data_type), Tensor([self.K * self.bs, self.N], self.data_type)
         )
         matmul_latency2 = (
             matmul.compile_and_simulate(pcb_module, compile_mode)
@@ -120,8 +140,10 @@ class BatchedMatmul(Operator):
 
 
 class Matmul(Operator):
-    def __init__(self, data_type: DataType):
+    def __init__(self, data_type: DataType, output_type=None):
         super().__init__(0, 0, 0, 0, data_type)
+        self.output_type = output_type or data_type
+        self.accumulator_type = data_type_dict["fp32"]
         self.input1_shape = None
         self.input2_shape = None
         self.output_shape = None
@@ -142,7 +164,7 @@ class Matmul(Operator):
             self.output_shape = [self.M, self.N]
         else:
             self.output_shape = self.input1_shape[:-1] + [self.N]
-        output = Tensor(self.output_shape, self.data_type)
+        output = Tensor(self.output_shape, self.output_type)
         self.computational_graph = self.ComputationalGraph(
             self.M, self.N, self.K, self.data_type
         )
@@ -152,6 +174,18 @@ class Matmul(Operator):
         return output
 
     def roofline_model(self, pcb_module: Device):
+        if pcb_module.compute_module.core.systolic_array.precision_profile is not None:
+            io_bytes = (self.data_type.storage_bytes([self.M, self.K])
+                        + self.data_type.storage_bytes([self.K, self.N], block_axis=-2)
+                        + self.output_type.storage_bytes([self.M, self.N]))
+            self.roofline_latency = max(
+                self.flop_count / pcb_module.compute_module.systolic_flops(self.data_type),
+                io_bytes / min(pcb_module.io_module.bandwidth,
+                               pcb_module.compute_module.l2_bandwidth_per_cycle
+                               * pcb_module.compute_module.clock_freq))
+            return self.roofline_latency
+        if self.data_type.block_size != 1:
+            raise ValueError("Block formats require an explicit precision_profile")
         self.roofline_latency = max(
             self.flop_count / pcb_module.compute_module.total_systolic_array_flops,
             self.io_count
@@ -277,6 +311,19 @@ class Matmul(Operator):
         pcb_module: Device,
         compile_mode: str = "exhaustive",
     ):
+        if pcb_module.compute_module.core.systolic_array.precision_profile is not None:
+            from systolic_array_model.precision_k import analyze_matmul
+            # Opt-in profile always dispatches here, including M=1 decode.
+            # compile_mode belongs to the legacy search and is not reinterpreted
+            # as a different precision mapping; this backend is explicitly OS.
+            self.precision_result = analyze_matmul(
+                self.M, self.N, self.K, self.data_type, self.output_type, pcb_module)
+            self.best_cycle_count = self.precision_result["compute_cycles"]
+            self.best_latency = self.precision_result["latency_seconds"]
+            self.latency = self.best_latency
+            return self.latency
+        if self.data_type.block_size != 1:
+            raise ValueError("Block formats require an explicit precision_profile")
         min_cycle_count = 2**63 - 1
         best_mapping = None
         M = self.computational_graph.M

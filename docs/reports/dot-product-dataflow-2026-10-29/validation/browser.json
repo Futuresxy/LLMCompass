@@ -1,0 +1,86 @@
+{
+  "status": "passed",
+  "browser": "local Chrome via CDP",
+  "calculator_checks": [
+    {
+      "preset": "base",
+      "input": {
+        "m": 256,
+        "n": 256,
+        "k": 4096,
+        "r": 16,
+        "c": 16,
+        "l": 64,
+        "bits": 4
+      },
+      "osIssues": 16384,
+      "wsIssues": 16384,
+      "folds": 4,
+      "osFinalBytes": 262144,
+      "wsAccReadBytes": 786432,
+      "wsAccWriteBytes": 1048576
+    },
+    {
+      "preset": "k2",
+      "input": {
+        "m": 256,
+        "n": 256,
+        "k": 4096,
+        "r": 16,
+        "c": 16,
+        "l": 128,
+        "bits": 4
+      },
+      "osIssues": 8192,
+      "wsIssues": 8192,
+      "folds": 2,
+      "osFinalBytes": 262144,
+      "wsAccReadBytes": 262144,
+      "wsAccWriteBytes": 524288
+    },
+    {
+      "preset": "n2",
+      "input": {
+        "m": 256,
+        "n": 256,
+        "k": 4096,
+        "r": 16,
+        "c": 32,
+        "l": 64,
+        "bits": 4
+      },
+      "osIssues": 8192,
+      "wsIssues": 8192,
+      "folds": 4,
+      "osFinalBytes": 262144,
+      "wsAccReadBytes": 786432,
+      "wsAccWriteBytes": 1048576
+    },
+    {
+      "preset": "short",
+      "input": {
+        "m": 256,
+        "n": 256,
+        "k": 256,
+        "r": 16,
+        "c": 16,
+        "l": 64,
+        "bits": 4
+      },
+      "osIssues": 1024,
+      "wsIssues": 4096,
+      "folds": 1,
+      "osFinalBytes": 262144,
+      "wsAccReadBytes": 0,
+      "wsAccWriteBytes": 262144
+    }
+  ],
+  "analytical_evidence_status": "passed",
+  "assertions": [
+    "Desktop/mobile document does not overflow",
+    "Four calculator presets checked",
+    "Two vector figures and comparison/table rendered",
+    "PDF generated"
+  ],
+  "note": "Browser validation is not hardware validation; visual inspection recorded separately."
+}

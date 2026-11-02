@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "date": "2026-10-29",
+  "scope": "Research and independent evidence only; production model unchanged",
+  "files_sha256": {
+    "report.html": "3027eab2ea54658353119bb6ce39034ca2821809700fc40fe11de053506ec8f0",
+    "report.pdf": "1560416e108ecefd8710586b0043dda491592121093e53bb79ce2656ce8fe32a",
+    "evidence/probe.py": "eaf0668790359abe13dcdecc5794caef5fbbbe8a63094b99a0d982f8e522b396",
+    "evidence/derive_traffic.py": "96d1fa7c8826d21ac5363578256ca34a5b180d3ef0323602d00a08611be0eef6",
+    "evidence/render_check.mjs": "ca4d3fe699f28ba27bf16225c7d140368a4ce3d25200dae44a66bfa3105b209a",
+    "evidence/residency_deadline.py": "f26fa8bfa1961239d7c2eec155bfb74e2f20bb85b32907c20ef6dda09104267e",
+    "evidence/device_feed_budget.py": "14c7e0fde9e9d25feef7aac8f3415fa38175b719435e16072b3fde1233a2c84b"
+  },
+  "checks": {
+    "local_links": 48,
+    "scalar_demand_cases": 2,
+    "dot_mapping_coverage_cases": 2,
+    "browser": "validation/browser.json",
+    "deadline_checks": "evidence/residency_deadline.json",
+    "device_feed_budgets": "evidence/device_feed_budget.json",
+    "gb100_metric_audit": "evidence/microarchitecture_access_audit.json"
+  },
+  "visual_inspection": "Desktop/mobile cover, two mechanism figures, comparison table, calculator, PDF formula and deadline pages inspected; no clipping observed. Hardware path table and GPU feed-budget table rendered and inspected. Microarchitecture access-counter table rendered and inspected.",
+  "limits": [
+    "Scalar demand probe is SCALE-Sim 2.0.2, not dot-PE timing",
+    "Derived issue counts exclude preload/fill/drain/stalls",
+    "Deadline checks are ideal service windows, not bank/RAW simulation",
+    "No new dataflow-specific CACTI area prediction or RTL/PDK validation performed",
+    "Vendor-path figures distinguish preload, matrix-read, and output paths; unknown TMEM/L0 internal peaks remain null.",
+    "GB100 counters were queried as profiler metadata on a host with RTX 4090; B200 measurements and per-cycle bank traces were not collected."
+  ]
+}

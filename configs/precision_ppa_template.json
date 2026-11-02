@@ -1,0 +1,13 @@
+{
+  "scope": "one_tensor_core",
+  "process_nm": null,
+  "voltage_v": null,
+  "frequency_hz": null,
+  "source": "Fill with your estimates at a common process, voltage and frequency. Null is unknown. Optional active_power_relative_by_format overrides the class-level power for a named format.",
+  "profiles": {
+    "1:2:4": {"area_relative": 1.0, "active_power_relative": {"16": 1.0, "8": 1.0, "4": 1.0}},
+    "1:2:6": {"area_relative": null, "active_power_relative": {"16": null, "8": null, "4": null}},
+    "1:2:8": {"area_relative": null, "active_power_relative": {"16": null, "8": null, "4": null}},
+    "1:4:8": {"area_relative": null, "active_power_relative": {"16": null, "8": null, "4": null}}
+  }
+}

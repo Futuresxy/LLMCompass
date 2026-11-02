@@ -1,5 +1,6 @@
 from math import ceil
 from software_model.utils import DataType, data_type_dict
+from hardware_model.precision import KExpansionProfile
 
 
 class VectorUnit:
@@ -39,12 +40,23 @@ class SystolicArray:
         mac_per_cycle,
         input_word_size,
         output_word_size,
+        precision_profile=None,
     ):
         self.array_height = array_height
         self.array_width = array_width
         self.mac_per_cycle = mac_per_cycle
         self.input_word_size = input_word_size
         self.output_word_size = output_word_size
+        if isinstance(precision_profile, dict):
+            precision_profile = KExpansionProfile.from_dict(precision_profile)
+        if precision_profile is not None and not isinstance(precision_profile, KExpansionProfile):
+            raise TypeError("precision_profile must be a KExpansionProfile or dict")
+        self.precision_profile = precision_profile
+
+    def macs_per_cycle(self, data_type):
+        per_pe = (self.precision_profile.dot_length(data_type)
+                  if self.precision_profile else self.mac_per_cycle)
+        return self.array_height * self.array_width * per_pe
 
 
 systolic_array_dict = {
@@ -137,13 +149,15 @@ class ComputeModule:
         self.total_systolic_array_flops = (
             core_count
             * core.systolic_array_count
-            * core.systolic_array.mac_per_cycle
             * 2
-            * core.systolic_array.array_height
-            * core.systolic_array.array_width
+            * core.systolic_array.macs_per_cycle(data_type_dict["fp16"])
             * clock_freq
         )
         self.overhead = overhead
+
+    def systolic_flops(self, data_type):
+        return (self.core.systolic_array.macs_per_cycle(data_type) * 2
+                * self.core.systolic_array_count * self.core_count * self.clock_freq)
 
 
 compute_module_dict = {

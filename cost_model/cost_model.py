@@ -203,6 +203,8 @@ def find_logic_sram_transistor_density(process_node):
 # at a specified process node
 # NB: you can fit multiple cores onto a single die for chiplet systems
 def calc_compute_chiplet_area_mm2(configs_dict, verbose=False):
+    if configs_dict['device']['compute_chiplet']['core']['systolic_array'].get('precision_profile') is not None:
+        raise ValueError("K-expanded multi-format arrays require supplied PPA; the legacy per-FPU area model is not applicable")
     total_die_map = {}
     core_breakdown_map = {}
     device_name = configs_dict['name']

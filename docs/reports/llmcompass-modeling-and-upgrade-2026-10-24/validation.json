@@ -1,0 +1,71 @@
+{
+  "date": "2026-10-24",
+  "artifact": "report.html",
+  "html_sha256": "9e39824b997f4a86a99ed90ace51a47a71762d46972556626f39dba424d09814",
+  "checks": {
+    "desktop": {
+      "title": "LLMCompass：从现有建模机制到现代 GPU／昇腾架构设计",
+      "sections": 18,
+      "figures": 7,
+      "tables": 11,
+      "math": 11,
+      "images": [
+        {
+          "complete": true,
+          "width": 1040,
+          "height": 490
+        },
+        {
+          "complete": true,
+          "width": 1040,
+          "height": 470
+        },
+        {
+          "complete": true,
+          "width": 1040,
+          "height": 520
+        },
+        {
+          "complete": true,
+          "width": 1040,
+          "height": 570
+        },
+        {
+          "complete": true,
+          "width": 1040,
+          "height": 625
+        },
+        {
+          "complete": true,
+          "width": 1040,
+          "height": 530
+        },
+        {
+          "complete": true,
+          "width": 1040,
+          "height": 450
+        }
+      ],
+      "viewport": 1440,
+      "documentWidth": 1425,
+      "bodyHeight": 24809,
+      "externalAssets": [],
+      "tocLinks": 0
+    },
+    "mobile": {
+      "viewport": 390,
+      "documentWidth": 375,
+      "overflow": []
+    },
+    "all_local_links_resolve": true,
+    "duplicate_html_ids": 0,
+    "tracked_worktree_and_index_unchanged": true,
+    "visual_inspection": "Rendered cover, section samples and all seven diagrams inspected in Chrome screenshots."
+  },
+  "limitations": [
+    "No GPU or NPU measurement performed.",
+    "No full simulation or paper reproduction performed.",
+    "Print/PDF pagination not validated."
+  ],
+  "simulation_evidence": "evidence.json"
+}
